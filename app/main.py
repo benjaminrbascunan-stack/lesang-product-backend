@@ -1,19 +1,35 @@
 from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from app.db import supabase
 
 app = FastAPI()
+
+
+class ItemCreate(BaseModel):
+    title: str
+    brand: str
+    category: str
+    status: str
+
 
 @app.get("/")
 def root():
     return {"message": "Lé Sang backend funcionando"}
 
+
+@app.get("/items")
+def get_items():
+    response = supabase.table("items").select("*").execute()
+    return response.data
+
+
 @app.post("/items")
-def create_item():
+def create_item(item: ItemCreate):
     data = {
-        "title": "Test product",
-        "brand": "Test brand",
-        "category": "Test category",
-        "status": "pending"
+        "title": item.title,
+        "brand": item.brand,
+        "category": item.category,
+        "status": item.status
     }
 
     try:
