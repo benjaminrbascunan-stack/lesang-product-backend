@@ -8,6 +8,7 @@ from io import BytesIO
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from supabase import create_client, Client
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -22,11 +23,21 @@ load_dotenv()
 # =========================
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 FOLDER_ID = "1yfADUnnIXsCTqRI7wcZ6ctao60VHXu-R"
 GROUP_GAP_SECONDS = 300
 
+if not OPENAI_API_KEY:
+    raise ValueError("Falta OPENAI_API_KEY en .env")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise ValueError("Faltan SUPABASE_URL o SUPABASE_KEY en .env")
+
 client = OpenAI(api_key=OPENAI_API_KEY)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 LE_SANG_TEXT = """Prenda de diseñador cuidadosamente seleccionada por Lé Sang. Cada pieza ha sido revisada en detalle para asegurar su calidad, autenticidad y condición, priorizando siempre aquellas que mantienen relevancia en diseño y uso actual.
 
@@ -34,7 +45,7 @@ Debido a la naturaleza única de este tipo de piezas, el stock es limitado y no 
 
 
 # =========================
-# DRIVE AUTH
+# GOOGLE DRIVE AUTH
 # =========================
 
 def get_drive_service():
@@ -85,7 +96,6 @@ def get_images(service):
     )
 
     files = results.get("files", [])
-
     print(f"Se encontraron {len(files)} imágenes.\n")
     return files
 
@@ -133,9 +143,10 @@ def download_drive_file_bytes(service, file_id: str) -> bytes:
 
 
 def guess_mime_type(filename: str) -> str:
-    if filename.lower().endswith(".png"):
+    lower = filename.lower()
+    if lower.endswith(".png"):
         return "image/png"
-    if filename.lower().endswith(".webp"):
+    if lower.endswith(".webp"):
         return "image/webp"
     return "image/jpeg"
 
@@ -159,6 +170,56 @@ def build_openai_image_inputs(service, group):
     return content
 
 
+def build_image_data(group):
+    images = []
+
+    for file in group:
+        images.append({
+            "id": file["id"],
+            "name": file["name"],
+            "url": f"https://drive.google.com/uc?id={file['id']}"
+        })
+
+    return images
+
+
+# =========================
+# DUPLICATES
+# =========================
+
+def build_group_signature(image_data):
+    ids = sorted([img["id"] for img in image_data])
+    return "|".join(ids)
+
+
+def find_existing_item_by_images(image_data):
+    """
+    Busca un item existente comparando los IDs de image_urls.
+    """
+    signature_to_find = build_group_signature(image_data)
+
+    response = supabase.table("items").select("id,image_urls").execute()
+    items = response.data or []
+
+    for item in items:
+        existing_images = item.get("image_urls") or []
+
+        if not isinstance(existing_images, list):
+            continue
+
+        existing_ids = []
+        for img in existing_images:
+            if isinstance(img, dict) and "id" in img:
+                existing_ids.append(img["id"])
+
+        existing_signature = "|".join(sorted(existing_ids))
+
+        if existing_signature == signature_to_find:
+            return item["id"]
+
+    return None
+
+
 # =========================
 # CATEGORY MAPPING
 # =========================
@@ -166,7 +227,10 @@ def build_openai_image_inputs(service, group):
 def map_shopify_category(category: str) -> str:
     c = category.strip().lower()
 
-    if c in {"hoodie", "sweatshirt", "crewneck", "t-shirt", "shirt", "polo", "knit", "jacket", "coat", "blazer", "vest", "top"}:
+    if c in {
+        "hoodie", "sweatshirt", "crewneck", "t-shirt", "shirt", "polo",
+        "knit", "jacket", "coat", "blazer", "vest", "top"
+    }:
         return "SUPERIOR"
 
     if c in {"pants", "jeans", "shorts", "skirt", "trousers"}:
@@ -261,19 +325,14 @@ def analyze_group_with_ai(service, group):
     brand = data.get("brand", "Pendiente").strip() or "Pendiente"
     size = data.get("size", "Pendiente").strip() or "Pendiente"
 
-    # Título forzado
     data["title"] = f"{category} {brand}"
-
-    # Categoría Shopify calculada por código
     data["shopify_category"] = map_shopify_category(category)
 
-    # Descripción siempre en español
     description = data.get("ai_description", "").strip()
     if any(word in description.lower() for word in [" the ", " with ", " and ", " made ", "front", "label", "visible"]):
         print("Reescribiendo descripción al español...")
         description = force_spanish(description)
 
-    # Notes siempre en español
     notes = data.get("notes", "").strip()
     if any(word in notes.lower() for word in [" the ", " with ", " and ", " made ", "visible", "label", "wear"]):
         print("Reescribiendo notas al español...")
@@ -285,6 +344,55 @@ def analyze_group_with_ai(service, group):
 
     print("Análisis IA completado.\n")
     return data
+
+
+# =========================
+# SUPABASE SAVE
+# =========================
+
+def build_item_payload(group, ai_result):
+    image_data = build_image_data(group)
+
+    payload = {
+        "title": ai_result["title"],
+        "brand": ai_result["brand"],
+        "category": ai_result["category"],
+        "size": ai_result["size"],
+        "status": "ready_for_review",
+        "drive_folder_id": FOLDER_ID,
+        "ai_description": ai_result["ai_description"],
+        "notes": ai_result["notes"],
+        "shopify_status": "draft",
+        "shopify_category": ai_result["shopify_category"],
+        "image_urls": image_data,
+    }
+
+    return payload
+
+
+def save_item_to_supabase(group, ai_result):
+    image_data = build_image_data(group)
+    existing_item_id = find_existing_item_by_images(image_data)
+    payload = build_item_payload(group, ai_result)
+
+    if existing_item_id:
+        print(f"Item existente detectado: {existing_item_id}")
+        print("Actualizando item en Supabase...\n")
+
+        response = (
+            supabase.table("items")
+            .update(payload)
+            .eq("id", existing_item_id)
+            .execute()
+        )
+
+        return "updated", response.data
+
+    print("No existe item previo para este grupo.")
+    print("Creando item nuevo en Supabase...\n")
+
+    response = supabase.table("items").insert(payload).execute()
+    return "created", response.data
 
 
 # =========================
@@ -324,10 +432,16 @@ def main():
         print(f"- {file['name']} | {file['createdTime']}")
     print()
 
-    result = analyze_group_with_ai(service, first_group)
+    ai_result = analyze_group_with_ai(service, first_group)
 
-    print("RESULTADO FINAL:\n")
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    print("RESULTADO IA:\n")
+    print(json.dumps(ai_result, indent=2, ensure_ascii=False))
+    print()
+
+    action, saved_data = save_item_to_supabase(first_group, ai_result)
+
+    print(f"ACCIÓN EN SUPABASE: {action.upper()}\n")
+    print(json.dumps(saved_data, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
