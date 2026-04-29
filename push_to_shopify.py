@@ -177,7 +177,7 @@ def get_drive_service():
     print("Conectando con Google Drive...")
     token_json = os.getenv("GOOGLE_TOKEN_JSON")
 
-    # ── MODO NUBE (Railway / cualquier servidor) ───────────────────────────────
+    # ── MODO NUBE (Railway) ────────────────────────────────────────────────────
     if token_json:
         print("Usando autenticación desde variables de entorno (nube)...")
         creds = Credentials.from_authorized_user_info(
@@ -204,11 +204,12 @@ def get_drive_service():
         with open(TOKEN_PATH, "w", encoding="utf-8") as token_file:
             token_file.write(creds.to_json())
     if not creds.valid:
-        raise RuntimeError(
-            "token.json no es válido. Volvé a autenticar Google Drive."
-        )
+        raise RuntimeError("token.json no es válido. Volvé a autenticar Google Drive.")
     print("✔ Google Drive conectado (local)")
     return build("drive", "v3", credentials=creds)
+
+
+drive_service = None
 
 
 def get_shopify_access_token() -> str:
