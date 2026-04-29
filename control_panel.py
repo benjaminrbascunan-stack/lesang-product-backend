@@ -458,7 +458,7 @@ HTML = """<!DOCTYPE html>
 <body>
 
 <header>
-  <div class="logo">LÉ SANG</div>
+  <img src="https://cdn.shopify.com/s/files/1/0862/4262/3795/files/logo.png?v=1776360657" style="height:32px; display:block;" />
   <div class="header-center">PANEL DE OPERACIONES</div>
   <div class="header-right" id="clock">—</div>
 </header>
