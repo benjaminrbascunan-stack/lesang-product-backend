@@ -121,7 +121,37 @@ def clamp_confidence(value) -> float:
 
 def get_drive_service():
     print("Conectando con Google Drive...")
+
+    import os
+    import json
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
     creds = None
+
+    # ===============================
+    # MODO NUBE (Railway)
+    # ===============================
+    token_json = os.getenv("GOOGLE_TOKEN_JSON")
+
+    if token_json:
+        print("Usando autenticación desde variables (nube)...")
+
+        creds = Credentials.from_authorized_user_info(
+            json.loads(token_json),
+            SCOPES
+        )
+
+        print("✔ Google Drive conectado (nube)\n")
+        return build("drive", "v3", credentials=creds)
+
+    # ===============================
+    # MODO LOCAL (tu código original)
+    # ===============================
+    print("Usando autenticación local...")
+
+    from google.auth.transport.requests import Request
+    from google_auth_oauthlib.flow import InstalledAppFlow
 
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
@@ -134,12 +164,12 @@ def get_drive_service():
             print("Abriendo autenticación de Google...")
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
+
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
-    print("Google Drive conectado.\n")
+    print("✔ Google Drive conectado (local)\n")
     return build("drive", "v3", credentials=creds)
-
 
 # =========================
 # DRIVE FILES
