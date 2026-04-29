@@ -1,24 +1,58 @@
 from __future__ import annotations
 
 import os
+import re
 import json
 import html
+from io import BytesIO
+from pathlib import Path
 from datetime import datetime, UTC
 
 import requests
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
 
-load_dotenv()
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+register_heif_opener()
 
-SHOPIFY_STORE_DOMAIN = os.getenv("SHOPIFY_STORE_DOMAIN")
-SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID")
-SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET")
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+BASE_DIR = Path(__file__).resolve().parent
+
+CREDENTIALS_PATH = BASE_DIR / "credentials.json"
+TOKEN_PATH = BASE_DIR / "token.json"
+
+load_dotenv(dotenv_path=ENV_PATH, override=True)
+
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+
+def clean_env(value: str | None) -> str:
+    return (value or "").strip().strip('"').strip("'")
+
+
+def clean_shop_domain(domain: str) -> str:
+    domain = clean_env(domain)
+    domain = domain.replace("https://", "").replace("http://", "")
+    domain = domain.rstrip("/")
+    return domain
+
+
+SUPABASE_URL = clean_env(os.getenv("SUPABASE_URL"))
+SUPABASE_KEY = clean_env(os.getenv("SUPABASE_KEY"))
+
+SHOPIFY_STORE_DOMAIN = clean_shop_domain(os.getenv("SHOPIFY_STORE_DOMAIN"))
+SHOPIFY_CLIENT_ID = clean_env(os.getenv("SHOPIFY_CLIENT_ID"))
+SHOPIFY_CLIENT_SECRET = clean_env(os.getenv("SHOPIFY_CLIENT_SECRET"))
 
 SHOPIFY_LOCATION_NUMERIC_ID = "96183910707"
+PRODUCT_IMAGES_BUCKET = "product-images"
+SHOPIFY_API_VERSION = "2026-04"
 
 SHOPIFY_COLLECTIONS = {
     "SUPERIOR": "gid://shopify/Collection/471425515827",
@@ -32,13 +66,21 @@ SHOPIFY_COLLECTIONS = {
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Faltan SUPABASE_URL o SUPABASE_KEY en .env")
 
-if not SHOPIFY_STORE_DOMAIN or not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
-    raise ValueError("Faltan variables Shopify en .env")
+if not SHOPIFY_STORE_DOMAIN:
+    raise ValueError("Falta SHOPIFY_STORE_DOMAIN en .env")
+
+if not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
+    raise ValueError("Faltan SHOPIFY_CLIENT_ID o SHOPIFY_CLIENT_SECRET en .env")
+
+if not TOKEN_PATH.exists():
+    raise FileNotFoundError(f"No existe token.json en: {TOKEN_PATH}")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/2026-04/graphql.json"
-SHOPIFY_REST_BASE_URL = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/2026-04"
+SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+SHOPIFY_REST_BASE_URL = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}"
+SHOPIFY_TOKEN_URL = f"https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token"
+
 
 PRODUCT_CREATE_MUTATION = """
 mutation productCreate($input: ProductCreateInput!, $media: [CreateMediaInput!]) {
@@ -111,11 +153,56 @@ def gid_to_numeric_id(gid: str) -> str:
     return gid.split("/")[-1]
 
 
+def safe_filename(name: str) -> str:
+    name = (name or "image.jpg").lower().strip()
+    name = re.sub(r"\.[a-z0-9]+$", "", name)
+    name = re.sub(r"[^a-z0-9\-_]+", "-", name)
+    name = re.sub(r"-+", "-", name).strip("-")
+
+    if not name:
+        name = "image"
+
+    return f"{name}.jpg"
+
+
+def debug_env():
+    print_section("DEBUG ENV")
+    print(f"ENV PATH: {ENV_PATH}")
+    print(f"TOKEN PATH: {TOKEN_PATH}")
+    print(f"SHOPIFY_STORE_DOMAIN: {SHOPIFY_STORE_DOMAIN}")
+    print(f"SHOPIFY_TOKEN_URL: {SHOPIFY_TOKEN_URL}")
+    print(f"SHOPIFY_GRAPHQL_URL: {SHOPIFY_GRAPHQL_URL}")
+    print(f"SHOPIFY_CLIENT_ID largo: {len(SHOPIFY_CLIENT_ID)}")
+    print(f"SHOPIFY_CLIENT_SECRET largo: {len(SHOPIFY_CLIENT_SECRET)}")
+
+
+def get_drive_service():
+    creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), DRIVE_SCOPES)
+
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+
+        with open(TOKEN_PATH, "w", encoding="utf-8") as token_file:
+            token_file.write(creds.to_json())
+
+    if not creds.valid:
+        raise RuntimeError(
+            "token.json no es válido. Vuelve a autenticar Google Drive con tu script de Drive."
+        )
+
+    return build("drive", "v3", credentials=creds)
+
+
+drive_service = get_drive_service()
+
+
 def get_shopify_access_token() -> str:
+    print_section("GENERANDO TOKEN SHOPIFY")
+
     response = requests.post(
-        f"https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token",
-        headers={"Content-Type": "application/json"},
-        json={
+        SHOPIFY_TOKEN_URL,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={
             "grant_type": "client_credentials",
             "client_id": SHOPIFY_CLIENT_ID,
             "client_secret": SHOPIFY_CLIENT_SECRET,
@@ -123,52 +210,80 @@ def get_shopify_access_token() -> str:
         timeout=60,
     )
 
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Error generando token Shopify HTTP {response.status_code}\n"
+            f"URL: {SHOPIFY_TOKEN_URL}\n"
+            f"Respuesta: {response.text[:1500]}"
+        )
+
     data = response.json()
+    access_token = clean_env(data.get("access_token"))
 
-    print("Shopify token scope:", data.get("scope"))
+    if not access_token:
+        raise RuntimeError(
+            f"Shopify no devolvió access_token:\n{json.dumps(data, ensure_ascii=False, indent=2)}"
+        )
 
-    token = data.get("access_token")
-    if not token:
-        raise RuntimeError(json.dumps(data, ensure_ascii=False))
+    print("✔ Token generado correctamente")
+    print(f"Token inicio: {access_token[:8]}...")
+    print(f"Expira en: {data.get('expires_in')} segundos")
+    print(f"Scopes: {data.get('scope')}")
 
-    return token
+    return access_token
 
 
 def shopify_graphql(query: str, variables: dict, access_token: str) -> dict:
+    token = clean_env(access_token)
+
     response = requests.post(
         SHOPIFY_GRAPHQL_URL,
         headers={
             "Content-Type": "application/json",
-            "X-Shopify-Access-Token": access_token,
+            "X-Shopify-Access-Token": token,
         },
         json={"query": query, "variables": variables},
         timeout=90,
     )
 
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Shopify GraphQL HTTP {response.status_code}\n"
+            f"URL: {SHOPIFY_GRAPHQL_URL}\n"
+            f"Token largo: {len(token)}\n"
+            f"Token inicio: {token[:8]}...\n"
+            f"Respuesta: {response.text[:1500]}"
+        )
+
     data = response.json()
 
     if data.get("errors"):
-        raise RuntimeError(json.dumps(data["errors"], ensure_ascii=False))
+        raise RuntimeError(json.dumps(data["errors"], ensure_ascii=False, indent=2))
 
     return data
 
 
 def shopify_rest(method: str, path: str, payload: dict, access_token: str) -> dict:
+    token = clean_env(access_token)
+    url = f"{SHOPIFY_REST_BASE_URL}{path}"
+
     response = requests.request(
         method=method,
-        url=f"{SHOPIFY_REST_BASE_URL}{path}",
+        url=url,
         headers={
             "Content-Type": "application/json",
-            "X-Shopify-Access-Token": access_token,
+            "X-Shopify-Access-Token": token,
         },
         json=payload,
         timeout=90,
     )
 
     if response.status_code >= 400:
-        raise RuntimeError(response.text)
+        raise RuntimeError(
+            f"Shopify REST HTTP {response.status_code}\n"
+            f"URL: {url}\n"
+            f"Respuesta: {response.text[:1500]}"
+        )
 
     if not response.text:
         return {}
@@ -176,11 +291,30 @@ def shopify_rest(method: str, path: str, payload: dict, access_token: str) -> di
     return response.json()
 
 
+def test_shopify_auth(access_token: str):
+    print_section("TEST SHOPIFY AUTH")
+
+    data = shopify_graphql(
+        query="""
+        query {
+          shop {
+            name
+            myshopifyDomain
+          }
+        }
+        """,
+        variables={},
+        access_token=access_token,
+    )
+
+    shop = data.get("data", {}).get("shop", {})
+
+    print("✔ Shopify autenticó correctamente")
+    print(f"Tienda: {shop.get('name')}")
+    print(f"Dominio: {shop.get('myshopifyDomain')}")
+
+
 def fetch_items_to_push():
-    """
-    Validación principal:
-    Solo trae items que todavía NO tienen shopify_product_gid.
-    """
     response = (
         supabase.table("items")
         .select("*")
@@ -189,7 +323,161 @@ def fetch_items_to_push():
         .is_("shopify_product_gid", "null")
         .execute()
     )
+
     return response.data or []
+
+
+def update_item_success(item_id: str, product: dict):
+    payload = {
+        "status": "pushed_to_shopify",
+        "shopify_product_gid": product.get("id"),
+        "shopify_handle": product.get("handle"),
+        "shopify_status": "created",
+        "shopify_pushed_at": now_iso(),
+        "shopify_error": None,
+    }
+
+    supabase.table("items").update(payload).eq("id", item_id).execute()
+
+
+def mark_item_as_existing(item_id: str, product: dict):
+    payload = {
+        "status": "pushed_to_shopify",
+        "shopify_product_gid": product.get("id"),
+        "shopify_handle": product.get("handle"),
+        "shopify_status": "created",
+        "shopify_pushed_at": now_iso(),
+        "shopify_error": "Producto ya existía en Shopify. Marcado como existente por SKU.",
+    }
+
+    supabase.table("items").update(payload).eq("id", item_id).execute()
+
+
+def update_item_error(item_id: str, error_message: str):
+    payload = {
+        "shopify_error": error_message,
+        "shopify_pushed_at": now_iso(),
+    }
+
+    supabase.table("items").update(payload).eq("id", item_id).execute()
+
+
+def download_drive_image(image: dict) -> bytes:
+    file_id = image.get("id")
+    filename = image.get("name") or file_id
+
+    if not file_id:
+        raise ValueError("Imagen sin id de Drive")
+
+    print(f"  descargando Drive API: {filename}")
+
+    request = drive_service.files().get_media(fileId=file_id)
+    buffer = BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+
+    content = buffer.getvalue()
+
+    if not content:
+        raise RuntimeError(f"Drive API devolvió archivo vacío para {filename} ({file_id})")
+
+    if b"<html" in content[:300].lower():
+        raise RuntimeError(
+            f"Drive API devolvió HTML en vez de imagen para {filename} ({file_id})"
+        )
+
+    return content
+
+
+def convert_to_real_jpg(image_bytes: bytes) -> bytes:
+    img = Image.open(BytesIO(image_bytes))
+    img = ImageOps.exif_transpose(img)
+
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    img.thumbnail((4096, 4096))
+
+    output = BytesIO()
+    img.save(
+        output,
+        format="JPEG",
+        quality=88,
+        optimize=True,
+        progressive=False,
+    )
+
+    return output.getvalue()
+
+
+def upload_product_image_to_supabase(item_id: str, image: dict, position: int) -> str:
+    original_name = image.get("name") or f"image-{position}.jpg"
+    filename = safe_filename(original_name)
+    storage_path = f"{item_id}/{position:02d}-{filename}"
+
+    try:
+        existing = supabase.storage.from_(PRODUCT_IMAGES_BUCKET).download(storage_path)
+
+        if existing:
+            public_url = supabase.storage.from_(PRODUCT_IMAGES_BUCKET).get_public_url(storage_path)
+            print(f"  imagen ya existe en Supabase: {storage_path}")
+            return public_url
+
+    except Exception:
+        pass
+
+    raw_bytes = download_drive_image(image)
+
+    print("  convirtiendo a JPG real")
+    jpg_bytes = convert_to_real_jpg(raw_bytes)
+
+    print(f"  subiendo a Supabase: {storage_path}")
+    supabase.storage.from_(PRODUCT_IMAGES_BUCKET).upload(
+        storage_path,
+        jpg_bytes,
+        {
+            "content-type": "image/jpeg",
+            "upsert": "true",
+        },
+    )
+
+    public_url = supabase.storage.from_(PRODUCT_IMAGES_BUCKET).get_public_url(storage_path)
+    return public_url
+
+
+def build_shopify_media_from_images(item: dict) -> list[dict]:
+    media = []
+    images = item.get("image_urls") or []
+
+    if not isinstance(images, list):
+        return media
+
+    title = item.get("title") or "Producto Lé Sang"
+    item_id = item["id"]
+
+    for index, image in enumerate(images, start=1):
+        if not isinstance(image, dict):
+            continue
+
+        try:
+            public_url = upload_product_image_to_supabase(item_id, image, index)
+        except Exception as e:
+            raise RuntimeError(
+                f"Error preparando imagen {image.get('name')} para Shopify: {e}"
+            )
+
+        media.append(
+            {
+                "mediaContentType": "IMAGE",
+                "originalSource": public_url,
+                "alt": image.get("name") or title,
+            }
+        )
+
+    return media
 
 
 def description_to_html(text: str) -> str:
@@ -199,8 +487,8 @@ def description_to_html(text: str) -> str:
         return ""
 
     paragraphs = [p.strip() for p in clean.split("\n\n") if p.strip()]
-
     html_paragraphs = []
+
     for paragraph in paragraphs:
         escaped = html.escape(paragraph).replace("\n", "<br>")
         html_paragraphs.append(f"<p>{escaped}</p>")
@@ -226,38 +514,6 @@ def build_tags(item: dict) -> list[str]:
     tags.append(f"supabase_id:{item['id']}")
 
     return tags
-
-
-def drive_image_url(file_id: str) -> str:
-    return f"https://drive.google.com/uc?export=view&id={file_id}"
-
-
-def build_shopify_media(item: dict) -> list[dict]:
-    media = []
-    images = item.get("image_urls") or []
-
-    if not isinstance(images, list):
-        return media
-
-    title = item.get("title") or "Producto Lé Sang"
-
-    for image in images:
-        if not isinstance(image, dict):
-            continue
-
-        file_id = image.get("id")
-        name = image.get("name") or title
-
-        if not file_id:
-            continue
-
-        media.append({
-            "mediaContentType": "IMAGE",
-            "originalSource": drive_image_url(file_id),
-            "alt": name,
-        })
-
-    return media
 
 
 def build_shopify_input(item: dict) -> dict:
@@ -287,7 +543,7 @@ def find_existing_shopify_product_by_sku(sku: str, access_token: str) -> dict | 
 
 
 def create_shopify_product(item: dict, access_token: str) -> dict:
-    media = build_shopify_media(item)
+    media = build_shopify_media_from_images(item)
 
     print(f"  Imágenes a subir: {len(media)}")
 
@@ -304,12 +560,12 @@ def create_shopify_product(item: dict, access_token: str) -> dict:
     user_errors = result.get("userErrors", [])
 
     if user_errors:
-        raise RuntimeError(json.dumps(user_errors, ensure_ascii=False))
+        raise RuntimeError(json.dumps(user_errors, ensure_ascii=False, indent=2))
 
     product = result.get("product")
 
     if not product:
-        raise RuntimeError(json.dumps(data, ensure_ascii=False))
+        raise RuntimeError(json.dumps(data, ensure_ascii=False, indent=2))
 
     return product
 
@@ -409,7 +665,7 @@ def add_product_to_collection(product_gid: str, collection_gid: str, access_toke
     user_errors = result.get("userErrors", [])
 
     if user_errors:
-        raise RuntimeError(json.dumps(user_errors, ensure_ascii=False))
+        raise RuntimeError(json.dumps(user_errors, ensure_ascii=False, indent=2))
 
     return result.get("collection")
 
@@ -440,60 +696,11 @@ def add_product_to_collections(item: dict, product_gid: str, access_token: str):
         print(f"  Añadido a colección: {collection_key}")
 
 
-def update_item_success(item_id: str, product: dict):
-    payload = {
-        "status": "pushed_to_shopify",
-        "shopify_product_gid": product.get("id"),
-        "shopify_handle": product.get("handle"),
-        "shopify_status": "created",
-        "shopify_pushed_at": now_iso(),
-        "shopify_error": None,
-    }
-
-    (
-        supabase.table("items")
-        .update(payload)
-        .eq("id", item_id)
-        .execute()
-    )
-
-
-def mark_item_as_existing(item_id: str, product: dict):
-    payload = {
-        "status": "pushed_to_shopify",
-        "shopify_product_gid": product.get("id"),
-        "shopify_handle": product.get("handle"),
-        "shopify_status": "created",
-        "shopify_pushed_at": now_iso(),
-        "shopify_error": "Producto ya existía en Shopify. Marcado como existente por SKU.",
-    }
-
-    (
-        supabase.table("items")
-        .update(payload)
-        .eq("id", item_id)
-        .execute()
-    )
-
-
-def update_item_error(item_id: str, error_message: str):
-    payload = {
-        "shopify_error": error_message,
-        "shopify_pushed_at": now_iso(),
-    }
-
-    (
-        supabase.table("items")
-        .update(payload)
-        .eq("id", item_id)
-        .execute()
-    )
-
-
 def main():
-    print_section("GENERANDO TOKEN DE SHOPIFY")
+    debug_env()
+
     access_token = get_shopify_access_token()
-    print("✔ Token obtenido correctamente.")
+    test_shopify_auth(access_token)
 
     print_section("BUSCANDO ITEMS NUEVOS PARA SHOPIFY")
     items = fetch_items_to_push()
@@ -545,7 +752,6 @@ def main():
             add_product_to_collections(item, product["id"], access_token)
 
             update_item_success(item_id, product)
-
             success_count += 1
 
         except Exception as e:

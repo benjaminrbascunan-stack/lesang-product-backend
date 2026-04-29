@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import os
+import re
 import json
 import base64
-from datetime import datetime
+import hashlib
+from datetime import datetime, UTC
 from io import BytesIO
 
 from dotenv import load_dotenv
 from openai import OpenAI
 from supabase import create_client, Client
+from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
+
+register_heif_opener()
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -26,13 +32,31 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+# Mantener este mismo scope en todos los scripts para no tener que reautorizar.
+SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+# Carpeta madre donde están las carpetas ya ordenadas por producto.
 FOLDER_ID = "1yfADUnnIXsCTqRI7wcZ6ctao60VHXu-R"
 
-GROUP_GAP_SECONDS = 300
-SAME_ITEM_THRESHOLD = 0.70
-
 CACHE_TABLE = "ingest_groups_cache"
+IMAGE_CACHE_BUCKET = "ai-image-cache"
+
+PRODUCT_ANALYSIS_MAX_SIZE = 1024
+PRODUCT_ANALYSIS_QUALITY = 78
+
+PRODUCT_VALIDATION_MAX_SIZE = 1024
+PRODUCT_VALIDATION_QUALITY = 78
+
+# Si una carpeta tiene una mezcla evidente, no crea item.
+VALIDATION_CONFIDENCE_MIN = 0.75
+FABRIC_MATCH_MIN = 0.70
+
+SKIP_FOLDER_NAMES = {
+    "REVISAR",
+    "revisar",
+    "Review",
+    "review",
+}
 
 if not OPENAI_API_KEY:
     raise ValueError("Falta OPENAI_API_KEY en .env")
@@ -46,6 +70,56 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 LE_SANG_TEXT = """Prenda de diseñador cuidadosamente seleccionada por Lé Sang. Cada pieza ha sido revisada en detalle para asegurar su calidad, autenticidad y condición, priorizando siempre aquellas que mantienen relevancia en diseño y uso actual.
 
 Debido a la naturaleza única de este tipo de piezas, el stock es limitado y no se repone. Una vez vendida, no vuelve a estar disponible. Cada producto es una oportunidad puntual dentro de una selección en constante cambio."""
+
+BANNED_MARKETING_TERMS = [
+    "descubre",
+    "perfecto",
+    "perfecta",
+    "ideal",
+    "añade un toque",
+    "guardarropa",
+    "sofisticación",
+    "elegante",
+    "elegantes",
+    "moderno",
+    "moderna",
+    "cualquier ocasión",
+    "alta calidad",
+    "must have",
+    "imprescindible",
+    "luce",
+    "estilo único",
+]
+
+
+# =========================
+# HELPERS
+# =========================
+
+def now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def print_section(title: str):
+    print("\n" + "=" * 80)
+    print(title)
+    print("=" * 80)
+
+
+def natural_sort_key(text: str):
+    return [
+        int(part) if part.isdigit() else part.lower()
+        for part in re.split(r"(\d+)", text)
+    ]
+
+
+def hash_signature(signature: str) -> str:
+    return hashlib.md5(signature.encode("utf-8")).hexdigest()
+
+
+def build_hashed_signature(prefix: str, values: list[str]) -> str:
+    raw = prefix + "|" + "|".join(sorted(values))
+    return hash_signature(raw)
 
 
 # =========================
@@ -80,97 +154,77 @@ def get_drive_service():
 
 
 # =========================
-# TIME HELPERS
+# DRIVE FOLDERS / FILES
 # =========================
 
-def parse_google_time(value: str | None) -> datetime | None:
-    if not value:
-        return None
+def list_product_folders(service) -> list[dict]:
+    print("Buscando subcarpetas de producto en Drive...")
 
-    normalized = value.replace("Z", "+00:00")
-    try:
-        return datetime.fromisoformat(normalized)
-    except ValueError:
-        return None
-
-
-def resolve_sort_time(file: dict) -> datetime:
-    metadata = file.get("imageMediaMetadata") or {}
-    exif_time = None
-
-    if isinstance(metadata, dict):
-        exif_time = parse_google_time(metadata.get("time"))
-
-    drive_time = parse_google_time(file.get("createdTime"))
-
-    if exif_time:
-        return exif_time
-    if drive_time:
-        return drive_time
-
-    raise ValueError(f"No se pudo resolver tiempo para {file.get('name', 'archivo desconocido')}")
-
-
-# =========================
-# DRIVE
-# =========================
-
-def get_images(service):
-    print("Buscando imágenes en la carpeta de Drive...")
-
-    query = f"'{FOLDER_ID}' in parents and mimeType contains 'image/' and trashed = false"
-
-    results = (
-        service.files()
-        .list(
-            q=query,
-            pageSize=300,
-            fields="files(id, name, mimeType, createdTime, imageMediaMetadata(time))",
-            orderBy="createdTime"
-        )
-        .execute()
+    query = (
+        f"'{FOLDER_ID}' in parents and "
+        "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     )
 
-    files = results.get("files", [])
+    folders = []
+    page_token = None
 
-    for file in files:
-        sort_time = resolve_sort_time(file)
-        file["sort_time"] = sort_time.isoformat()
+    while True:
+        response = (
+            service.files()
+            .list(
+                q=query,
+                pageSize=500,
+                fields="nextPageToken, files(id, name, mimeType, createdTime)",
+                orderBy="name",
+                pageToken=page_token,
+            )
+            .execute()
+        )
 
-    files.sort(key=lambda f: f["sort_time"])
+        folders.extend(response.get("files", []))
+        page_token = response.get("nextPageToken")
 
-    print(f"Se encontraron {len(files)} imágenes.\n")
+        if not page_token:
+            break
+
+    folders = [folder for folder in folders if folder["name"] not in SKIP_FOLDER_NAMES]
+    folders.sort(key=lambda f: natural_sort_key(f["name"]))
+
+    print(f"Se encontraron {len(folders)} carpetas de producto.\n")
+    return folders
+
+
+def list_images_in_folder(service, folder_id: str) -> list[dict]:
+    query = f"'{folder_id}' in parents and mimeType contains 'image/' and trashed = false"
+
+    files = []
+    page_token = None
+
+    while True:
+        response = (
+            service.files()
+            .list(
+                q=query,
+                pageSize=500,
+                fields="nextPageToken, files(id, name, mimeType, createdTime, imageMediaMetadata(time))",
+                orderBy="name",
+                pageToken=page_token,
+            )
+            .execute()
+        )
+
+        files.extend(response.get("files", []))
+        page_token = response.get("nextPageToken")
+
+        if not page_token:
+            break
+
+    files.sort(key=lambda f: natural_sort_key(f["name"]))
     return files
 
 
-def group_images(files):
-    print("Agrupando imágenes por metadata temporal...")
-
-    groups = []
-    current_group = []
-    previous_time = None
-
-    for file in files:
-        current_time = datetime.fromisoformat(file["sort_time"])
-
-        if previous_time:
-            diff = (current_time - previous_time).total_seconds()
-            if diff > GROUP_GAP_SECONDS:
-                groups.append(current_group)
-                current_group = []
-
-        current_group.append(file)
-        previous_time = current_time
-
-    if current_group:
-        groups.append(current_group)
-
-    print(f"Se detectaron {len(groups)} grupos candidatos.\n")
-    return groups
-
-
 # =========================
-# DOWNLOAD
+# IMAGE DOWNLOAD / COMPRESSION / SUPABASE CACHE
 # =========================
 
 def download_drive_file_bytes(service, file_id: str) -> bytes:
@@ -185,58 +239,108 @@ def download_drive_file_bytes(service, file_id: str) -> bytes:
     return file_buffer.getvalue()
 
 
-def guess_mime_type(filename: str) -> str:
-    lower = filename.lower()
-    if lower.endswith(".png"):
-        return "image/png"
-    if lower.endswith(".webp"):
-        return "image/webp"
-    return "image/jpeg"
+def compress_image_for_ai(file_bytes: bytes, max_size: int = 1024, quality: int = 78) -> bytes:
+    image = Image.open(BytesIO(file_bytes))
+    image = ImageOps.exif_transpose(image)
+
+    if image.mode not in ("RGB", "L"):
+        image = image.convert("RGB")
+    elif image.mode == "L":
+        image = image.convert("RGB")
+
+    image.thumbnail((max_size, max_size))
+
+    output = BytesIO()
+    image.save(
+        output,
+        format="JPEG",
+        quality=quality,
+        optimize=True,
+        progressive=True,
+    )
+
+    return output.getvalue()
 
 
-def build_openai_image_inputs(service, group):
-    print("Preparando imágenes para OpenAI...\n")
+def get_cached_compressed_image_from_supabase(service, file: dict, max_size: int, quality: int) -> bytes:
+    cache_path = f"{file['id']}_{max_size}_{quality}.jpg"
+
+    try:
+        cached = supabase.storage.from_(IMAGE_CACHE_BUCKET).download(cache_path)
+        print(f"  usando cache Supabase: {cache_path}")
+        return cached
+    except Exception:
+        pass
+
+    original_bytes = download_drive_file_bytes(service, file["id"])
+    compressed_bytes = compress_image_for_ai(
+        original_bytes,
+        max_size=max_size,
+        quality=quality,
+    )
+
+    supabase.storage.from_(IMAGE_CACHE_BUCKET).upload(
+        cache_path,
+        compressed_bytes,
+        {
+            "content-type": "image/jpeg",
+            "upsert": "true",
+        },
+    )
+
+    print(
+        f"  comprimida y subida a Supabase | "
+        f"original: {round(len(original_bytes) / 1024)} KB | "
+        f"IA: {round(len(compressed_bytes) / 1024)} KB"
+    )
+
+    return compressed_bytes
+
+
+def build_openai_image_inputs(service, images: list[dict], max_size: int, quality: int) -> list[dict]:
+    print("Preparando imágenes comprimidas para OpenAI...\n")
 
     content = []
 
-    for idx, file in enumerate(group):
+    for idx, file in enumerate(images):
         print(f"Usando imagen {idx}: {file['name']} | id={file['id']}")
-        file_bytes = download_drive_file_bytes(service, file["id"])
-        base64_image = base64.b64encode(file_bytes).decode("utf-8")
+
+        compressed_bytes = get_cached_compressed_image_from_supabase(
+            service=service,
+            file=file,
+            max_size=max_size,
+            quality=quality,
+        )
+
+        base64_image = base64.b64encode(compressed_bytes).decode("utf-8")
 
         content.append({
             "type": "input_image",
-            "image_url": f"data:{guess_mime_type(file['name'])};base64,{base64_image}",
+            "image_url": f"data:image/jpeg;base64,{base64_image}",
         })
 
     print("\nImágenes preparadas.\n")
     return content
 
 
-def build_image_data(group):
-    images = []
-
-    for file in group:
-        images.append({
+def build_image_data(images: list[dict]) -> list[dict]:
+    return [
+        {
             "id": file["id"],
             "name": file["name"],
-            "url": f"https://drive.google.com/uc?id={file['id']}"
-        })
-
-    return images
+            "url": f"https://drive.google.com/uc?id={file['id']}",
+        }
+        for file in images
+    ]
 
 
 # =========================
-# GROUP SIGNATURE / CACHE
+# CACHE TABLE
 # =========================
 
-def build_group_signature_from_ids(image_ids: list[str]) -> str:
-    return "|".join(sorted(image_ids))
-
-
-def build_group_signature(group: list[dict]) -> str:
-    image_ids = [file["id"] for file in group]
-    return build_group_signature_from_ids(image_ids)
+def build_product_folder_signature(folder: dict, images: list[dict]) -> str:
+    values = [folder["id"], folder["name"]] + [img["id"] for img in images]
+    return build_hashed_signature("product_folder_ingest_editorial_v1", values)
 
 
 def get_cache_record(group_signature: str):
@@ -247,6 +351,7 @@ def get_cache_record(group_signature: str):
         .limit(1)
         .execute()
     )
+
     rows = response.data or []
     return rows[0] if rows else None
 
@@ -268,7 +373,7 @@ def upsert_cache_record(
         "unassigned_image_ids": unassigned_image_ids,
         "reason": reason,
         "confidence": confidence,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": now_iso(),
     }
 
     response = (
@@ -281,16 +386,16 @@ def upsert_cache_record(
 
 
 # =========================
-# DUPLICATES / EXISTING ITEMS
+# EXISTING ITEMS
 # =========================
 
-def build_group_signature_from_image_data(image_data):
-    ids = sorted([img["id"] for img in image_data])
+def build_signature_from_image_data(image_data: list[dict]) -> str:
+    ids = sorted([img["id"] for img in image_data if isinstance(img, dict) and img.get("id")])
     return "|".join(ids)
 
 
-def find_existing_item_by_images(image_data):
-    signature_to_find = build_group_signature_from_image_data(image_data)
+def find_existing_item_by_images(image_data: list[dict]):
+    signature_to_find = build_signature_from_image_data(image_data)
 
     response = supabase.table("items").select("*").execute()
     items = response.data or []
@@ -301,12 +406,7 @@ def find_existing_item_by_images(image_data):
         if not isinstance(existing_images, list):
             continue
 
-        existing_ids = []
-        for img in existing_images:
-            if isinstance(img, dict) and "id" in img:
-                existing_ids.append(img["id"])
-
-        existing_signature = "|".join(sorted(existing_ids))
+        existing_signature = build_signature_from_image_data(existing_images)
 
         if existing_signature == signature_to_find:
             return item
@@ -329,11 +429,13 @@ def item_is_complete(item: dict) -> bool:
 
     for field in required_fields:
         value = item.get(field)
+
         if value is None:
             return False
+
         if isinstance(value, str):
             cleaned = value.strip()
-            if cleaned == "" or cleaned.lower() == "pendiente":
+            if cleaned == "":
                 return False
 
     return True
@@ -348,11 +450,15 @@ def map_shopify_category(category: str) -> str:
 
     if c in {
         "hoodie", "sweatshirt", "crewneck", "t-shirt", "shirt", "polo",
-        "knit", "jacket", "coat", "blazer", "vest", "top"
+        "knit", "jacket", "coat", "blazer", "vest", "top", "cardigan",
+        "sweater", "zip hoodie", "zip-up hoodie", "denim jacket",
     }:
         return "SUPERIOR"
 
-    if c in {"pants", "jeans", "shorts", "skirt", "trousers"}:
+    if c in {
+        "pants", "jeans", "shorts", "skirt", "trousers", "cargo pants",
+        "denim pants", "denim", "jean",
+    }:
         return "INFERIOR"
 
     if c in {"shoes", "sneakers", "boots", "loafers", "sandals"}:
@@ -368,34 +474,107 @@ def map_shopify_category(category: str) -> str:
 
 
 # =========================
-# FORCE SPANISH
+# TEXT HELPERS
 # =========================
 
 def force_spanish(text: str) -> str:
     response = client.responses.create(
-        model="gpt-5.4-mini",
-        input=f"Reescribe este texto en español neutro para e-commerce de moda. Devuelve solo el texto final:\n\n{text}"
+        model="gpt-4o",
+        input=(
+            "Reescribe este texto en español neutro, seco y descriptivo para catálogo de moda. "
+            "No uses lenguaje comercial. Devuelve solo el texto final:\n\n"
+            + text
+        ),
     )
+
     return response.output_text.strip()
 
 
+def rewrite_editorial_description(text: str) -> str:
+    response = client.responses.create(
+        model="gpt-4o",
+        input=(
+            "Reescribe este texto en español para Lé Sang, con tono de archivo/catálogo.\n\n"
+            "Reglas estrictas:\n"
+            "- No uses lenguaje de venta.\n"
+            "- No uses: descubre, perfecto, ideal, elegante, sofisticado, guardarropa, ocasión.\n"
+            "- No inventes información.\n"
+            "- Frases cortas.\n"
+            "- Prioriza tipo de prenda, marca, color/material, detalles visibles y estado.\n"
+            "- Máximo 3 frases.\n\n"
+            "Texto a reescribir:\n"
+            f"{text}"
+        ),
+    )
+
+    return response.output_text.strip()
+
+
+def clean_editorial_text(text: str) -> str:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return "Descripción pendiente."
+
+    lowered = cleaned.lower()
+
+    should_rewrite = any(term in lowered for term in BANNED_MARKETING_TERMS)
+    should_rewrite = should_rewrite or any(
+        word in lowered
+        for word in [" the ", " with ", " and ", " made ", "front", "label", "visible"]
+    )
+
+    if should_rewrite:
+        print("Reescribiendo descripción a tono editorial Lé Sang...")
+        cleaned = rewrite_editorial_description(cleaned)
+
+    # Normaliza exceso de líneas.
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return cleaned
+
+
+def clean_notes_text(text: str) -> str:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return ""
+
+    lowered = cleaned.lower()
+    if any(word in lowered for word in [" the ", " with ", " and ", " made ", "visible", "label", "wear"]):
+        print("Reescribiendo notas al español...")
+        cleaned = force_spanish(cleaned)
+
+    return cleaned.strip()
+
+
 # =========================
-# IA VALIDATION
+# AI VALIDATION / ANALYSIS
 # =========================
 
-def validate_group_with_ai(service, group):
-    image_inputs = build_openai_image_inputs(service, group)
+def validate_folder_product_with_ai(service, folder: dict, images: list[dict]) -> dict:
+    print("Validando que la carpeta corresponde a un solo producto...\n")
 
-    print("Validando visualmente grupo con IA...\n")
+    image_inputs = build_openai_image_inputs(
+        service=service,
+        images=images,
+        max_size=PRODUCT_VALIDATION_MAX_SIZE,
+        quality=PRODUCT_VALIDATION_QUALITY,
+    )
+
+    image_lines = []
+    for index, image in enumerate(images):
+        image_lines.append(f"{index}: {image['name']} | id={image['id']}")
 
     response = client.responses.create(
-        model="gpt-5.4-mini",
+        model="gpt-4o",
         instructions=(
-            "Evalúa si varias imágenes corresponden al mismo producto de moda. "
-            "Debes priorizar silueta, tela, color, estampado, costuras, construcción, bolsillos, cierres y detalles materiales. "
-            "No rechaces automáticamente un grupo porque las etiquetas aparezcan en ángulos distintos o porque algunas fotos sean detalles y otras sean vistas generales. "
-            "Solo rechaza si hay señales realmente fuertes de que son productos distintos. "
-            "Responde con criterio útil para operación de catálogo, no con criterio excesivamente conservador."
+            "Eres un validador estricto para catálogo de moda. "
+            "Recibirás imágenes que vienen de una carpeta ya revisada por una persona, donde cada carpeta debería representar un solo producto. "
+            "Tu tarea es validar si TODAS las imágenes pertenecen a una sola prenda. "
+            "La carpeta humana es una señal fuerte, así que no rechaces por falta de foto frontal si el set es coherente. "
+            "Sí debes rechazar si hay múltiples prendas evidentes, marcas incompatibles, categorías incompatibles o denim claramente distinto. "
+            "Si hay frente, espalda, etiqueta, detalles, interior o close-ups de la misma prenda, responde true. "
+            "Para denim, revisa tono, lavado, desgaste, costuras, color de hilo, textura y construcción. "
+            "Para etiquetas, revisa que el color/tela alrededor de la etiqueta sea compatible con la prenda. "
+            "No inventes información."
         ),
         input=[
             {
@@ -404,11 +583,10 @@ def validate_group_with_ai(service, group):
                     {
                         "type": "input_text",
                         "text": (
-                            "Analiza estas imágenes y devuelve JSON con: same_item_likely, same_item_confidence, reason. "
-                            "same_item_likely: true si es probable que todas las imágenes correspondan al mismo producto. "
-                            "same_item_confidence: número entre 0 y 1 que represente la probabilidad de que sea el mismo producto. "
-                            "reason: explicación breve en español. "
-                            "En esta evaluación debes dar más peso a tela, color, print, silueta y construcción que a pequeñas diferencias en etiquetas o encuadres."
+                            f"Carpeta de producto: {folder['name']} | id={folder['id']}\n\n"
+                            "Imágenes en la carpeta:\n"
+                            + "\n".join(image_lines)
+                            + "\n\nValida si esta carpeta representa un único producto."
                         ),
                     },
                     *image_inputs,
@@ -418,167 +596,84 @@ def validate_group_with_ai(service, group):
         text={
             "format": {
                 "type": "json_schema",
-                "name": "group_validation",
+                "name": "folder_product_validation",
                 "strict": True,
                 "schema": {
                     "type": "object",
                     "properties": {
-                        "same_item_likely": {"type": "boolean"},
-                        "same_item_confidence": {"type": "number"},
-                        "reason": {"type": "string"}
+                        "is_single_product": {"type": "boolean"},
+                        "confidence": {"type": "number"},
+                        "same_color_likely": {"type": "boolean"},
+                        "same_brand_likely": {"type": "boolean"},
+                        "same_category_likely": {"type": "boolean"},
+                        "label_color_matches_product": {"type": "boolean"},
+                        "fabric_match_confidence": {"type": "number"},
+                        "reason": {"type": "string"},
+                        "suspected_multiple_products": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
                     },
-                    "required": ["same_item_likely", "same_item_confidence", "reason"],
-                    "additionalProperties": False
-                }
+                    "required": [
+                        "is_single_product",
+                        "confidence",
+                        "same_color_likely",
+                        "same_brand_likely",
+                        "same_category_likely",
+                        "label_color_matches_product",
+                        "fabric_match_confidence",
+                        "reason",
+                        "suspected_multiple_products",
+                    ],
+                    "additionalProperties": False,
+                },
             }
-        }
+        },
     )
 
     result = json.loads(response.output_text)
 
-    print("Resultado validación IA:")
+    print("Resultado validación carpeta:")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print()
 
     return result
 
 
-def split_group_with_ai(service, group):
-    print("IA detectó mezcla, reagrupando...\n")
+def analyze_folder_product_with_ai(service, folder: dict, images: list[dict]) -> dict:
+    print("Analizando producto de carpeta con IA...\n")
 
-    image_inputs = build_openai_image_inputs(service, group)
-
-    id_map_lines = []
-    for file in group:
-        id_map_lines.append(f"{file['id']} -> {file['name']}")
-
-    id_map_text = "\n".join(id_map_lines)
-
-    response = client.responses.create(
-        model="gpt-5.4-mini",
-        instructions=(
-            "Vas a recibir múltiples imágenes que pueden pertenecer a distintos productos. "
-            "Tu tarea es agruparlas correctamente por producto. "
-            "Agrupa por similitud visual: silueta, tela, color, print, construcción. "
-            "Ignora diferencias de ángulo o etiquetas. "
-            "Debes devolver grupos usando únicamente los IDs de Drive entregados. "
-            "No repitas IDs en más de un grupo. "
-            "No inventes IDs. "
-            "Cada ID puede aparecer como máximo una vez."
-        ),
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": (
-                            "Estas son las imágenes disponibles con su ID de Drive:\n\n"
-                            f"{id_map_text}\n\n"
-                            "Devuelve JSON con un array llamado groups. "
-                            "Cada grupo debe contener los IDs de Drive de las imágenes que pertenecen al mismo producto. "
-                            "Usa únicamente los IDs entregados. "
-                            "No repitas ningún ID en dos grupos. "
-                            "Ejemplo correcto: [[\"id_1\",\"id_2\"],[\"id_3\",\"id_4\"]]."
-                        ),
-                    },
-                    *image_inputs,
-                ],
-            }
-        ],
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "group_split",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "groups": {
-                            "type": "array",
-                            "items": {
-                                "type": "array",
-                                "items": {"type": "string"}
-                            }
-                        }
-                    },
-                    "required": ["groups"],
-                    "additionalProperties": False
-                }
-            }
-        }
+    image_inputs = build_openai_image_inputs(
+        service=service,
+        images=images,
+        max_size=PRODUCT_ANALYSIS_MAX_SIZE,
+        quality=PRODUCT_ANALYSIS_QUALITY,
     )
 
-    result = json.loads(response.output_text)
-
-    print("Reagrupación IA:")
-    print(json.dumps(result, indent=2, ensure_ascii=False))
-    print()
-
-    return result["groups"]
-
-
-def sanitize_split_groups_by_ids(raw_groups, group):
-    valid_ids = {file["id"] for file in group}
-    globally_used = set()
-    cleaned_groups = []
-
-    for raw_group in raw_groups:
-        current_group_ids = []
-        current_seen = set()
-
-        for raw_id in raw_group:
-            if not isinstance(raw_id, str):
-                continue
-
-            image_id = raw_id.strip()
-
-            if not image_id:
-                continue
-
-            if image_id not in valid_ids:
-                print(f"Advertencia: ID inexistente ignorado -> {image_id}")
-                continue
-
-            if image_id in current_seen:
-                print(f"Advertencia: ID duplicado dentro del mismo subgrupo -> {image_id}")
-                continue
-
-            if image_id in globally_used:
-                print(f"Advertencia: ID repetido entre subgrupos, se ignora -> {image_id}")
-                continue
-
-            current_group_ids.append(image_id)
-            current_seen.add(image_id)
-            globally_used.add(image_id)
-
-        if current_group_ids:
-            cleaned_groups.append(current_group_ids)
-
-    print("Subgrupos sanitizados por ID:")
-    print(json.dumps(cleaned_groups, indent=2, ensure_ascii=False))
-    print()
-
-    return cleaned_groups
-
-
-# =========================
-# IA ANALYSIS
-# =========================
-
-def analyze_group_with_ai(service, group):
-    image_inputs = build_openai_image_inputs(service, group)
-
-    print("Analizando con IA...\n")
+    image_lines = []
+    for index, image in enumerate(images):
+        image_lines.append(f"{index}: {image['name']} | id={image['id']}")
 
     response = client.responses.create(
-        model="gpt-5.4-mini",
+        model="gpt-4o",
         instructions=(
-            "Analiza prendas de vestir con precisión. No inventes datos. "
+            "Eres parte del equipo editorial de Lé Sang. "
+            "Analiza UNA prenda de vestir para un catálogo de moda de diseñador/archivo. "
+            "La carpeta fue separada manualmente por producto, así que debes extraer la mayor cantidad de información útil. "
+            "No inventes datos: si no se ve, escribe 'Pendiente'. "
             "La descripción y las notas deben estar en español. "
-            "La categoría específica puede usar términos de moda en inglés como Hoodie, Crewneck, Loafers, Jacket, Pants. "
+            "La categoría específica puede usar términos de moda en inglés como Hoodie, Crewneck, Loafers, Jacket, Pants, Jeans, Shirt, Bag. "
             "La talla debe devolverse como campo propio llamado size. "
-            "Si no puedes determinar algo con seguridad, escribe 'Pendiente'."
+            "Si detectas claramente más de una prenda, escribe ERROR_MULTIPLE_PRODUCTS en todos los campos. "
+            "No describas lotes. No combines múltiples marcas. "
+            "\n\nReglas editoriales para ai_description: "
+            "NO uses lenguaje comercial ni de venta. "
+            "No uses palabras como descubre, perfecto, ideal, elegante, sofisticado, guardarropa, ocasión. "
+            "Escribe en tono seco, preciso, de archivo/catálogo. "
+            "Frases cortas. Máximo 3 frases. "
+            "Describe lo visible: tipo de prenda, marca, color/material, corte, detalles, estado. "
+            "Ejemplo correcto: 'Pantalones Jean Paul Gaultier en algodón blanco. Presentan aros metálicos en los laterales y corte recto. Buen estado general.' "
+            "Ejemplo incorrecto: 'Descubre estos elegantes pantalones, perfectos para añadir un toque de sofisticación a tu guardarropa.'"
         ),
         input=[
             {
@@ -587,12 +682,14 @@ def analyze_group_with_ai(service, group):
                     {
                         "type": "input_text",
                         "text": (
-                            "Devuelve JSON con los campos: title, brand, category, size, ai_description, notes. "
-                            "brand: solo si es visible o altamente probable. "
-                            "category: específica y simple, por ejemplo Hoodie, Crewneck, Pants, Jacket, Loafers, Shirt, Shoes, Bag. "
-                            "size: talla visible en etiqueta o prenda; si no se ve, escribe 'Pendiente'. "
-                            "ai_description: siempre en español, útil para catálogo. "
-                            "notes: siempre en español, observaciones adicionales, dudas, desgaste o detalles que valga la pena mencionar."
+                            f"Carpeta: {folder['name']}\n"
+                            "Imágenes:\n"
+                            + "\n".join(image_lines)
+                            + "\n\nDevuelve JSON con: title, brand, category, size, ai_description, notes. "
+                            "brand: solo si es visible o altamente probable por etiqueta/detalle. "
+                            "category: específica y simple. "
+                            "ai_description: descripción editorial, seca y factual para Shopify. "
+                            "notes: dudas, condición, detalles visibles, talla, composición o cualquier dato relevante."
                         ),
                     },
                     *image_inputs,
@@ -602,7 +699,7 @@ def analyze_group_with_ai(service, group):
         text={
             "format": {
                 "type": "json_schema",
-                "name": "catalog_item",
+                "name": "catalog_item_from_folder_editorial",
                 "strict": True,
                 "schema": {
                     "type": "object",
@@ -612,39 +709,48 @@ def analyze_group_with_ai(service, group):
                         "category": {"type": "string"},
                         "size": {"type": "string"},
                         "ai_description": {"type": "string"},
-                        "notes": {"type": "string"}
+                        "notes": {"type": "string"},
                     },
-                    "required": ["title", "brand", "category", "size", "ai_description", "notes"],
-                    "additionalProperties": False
-                }
+                    "required": [
+                        "title",
+                        "brand",
+                        "category",
+                        "size",
+                        "ai_description",
+                        "notes",
+                    ],
+                    "additionalProperties": False,
+                },
             }
-        }
+        },
     )
 
     data = json.loads(response.output_text)
 
-    category = data.get("category", "Accessory").strip() or "Accessory"
-    brand = data.get("brand", "Pendiente").strip() or "Pendiente"
-    size = data.get("size", "Pendiente").strip() or "Pendiente"
+    joined = json.dumps(data, ensure_ascii=False).lower()
+    if "error_multiple_products" in joined:
+        raise RuntimeError("La IA detectó múltiples productos dentro de la carpeta.")
 
-    data["title"] = f"{category} {brand}"
+    category = (data.get("category") or "Accessory").strip() or "Accessory"
+    brand = (data.get("brand") or "Pendiente").strip() or "Pendiente"
+    size = (data.get("size") or "Pendiente").strip() or "Pendiente"
+
+    data["title"] = f"{category} {brand}".strip()
+    data["brand"] = brand
+    data["category"] = category
+    data["size"] = size
     data["shopify_category"] = map_shopify_category(category)
 
-    description = data.get("ai_description", "").strip()
-    if any(word in description.lower() for word in [" the ", " with ", " and ", " made ", "front", "label", "visible"]):
-        print("Reescribiendo descripción al español...")
-        description = force_spanish(description)
+    description = clean_editorial_text((data.get("ai_description") or "").strip())
+    notes = clean_notes_text((data.get("notes") or "").strip())
 
-    notes = data.get("notes", "").strip()
-    if any(word in notes.lower() for word in [" the ", " with ", " and ", " made ", "visible", "label", "wear"]):
-        print("Reescribiendo notas al español...")
-        notes = force_spanish(notes)
-
-    data["size"] = size
     data["ai_description"] = f"{description}\n\n{LE_SANG_TEXT}"
     data["notes"] = notes
 
-    print("Análisis IA completado.\n")
+    print("Resultado análisis producto:")
+    print(json.dumps(data, indent=2, ensure_ascii=False))
+    print()
+
     return data
 
 
@@ -652,30 +758,36 @@ def analyze_group_with_ai(service, group):
 # SUPABASE SAVE
 # =========================
 
-def build_item_payload(group, ai_result):
-    image_data = build_image_data(group)
+def build_item_payload(folder: dict, images: list[dict], ai_result: dict) -> dict:
+    image_data = build_image_data(images)
 
-    payload = {
+    notes = ai_result["notes"]
+    folder_note = f"Carpeta Drive origen: {folder['name']} ({folder['id']})"
+
+    if notes:
+        notes = f"{notes}\n\n{folder_note}"
+    else:
+        notes = folder_note
+
+    return {
         "title": ai_result["title"],
         "brand": ai_result["brand"],
         "category": ai_result["category"],
         "size": ai_result["size"],
         "status": "ready_for_review",
-        "drive_folder_id": FOLDER_ID,
+        "drive_folder_id": folder["id"],
         "ai_description": ai_result["ai_description"],
-        "notes": ai_result["notes"],
+        "notes": notes,
         "shopify_status": "draft",
         "shopify_category": ai_result["shopify_category"],
         "image_urls": image_data,
     }
 
-    return payload
 
-
-def save_item_to_supabase(group, ai_result):
-    image_data = build_image_data(group)
+def save_item_to_supabase(folder: dict, images: list[dict], ai_result: dict):
+    image_data = build_image_data(images)
     existing_item = find_existing_item_by_images(image_data)
-    payload = build_item_payload(group, ai_result)
+    payload = build_item_payload(folder, images, ai_result)
 
     if existing_item:
         print(f"Item existente detectado: {existing_item['id']}")
@@ -690,173 +802,115 @@ def save_item_to_supabase(group, ai_result):
 
         return "updated", response.data
 
-    print("No existe item previo para este grupo.")
+    print("No existe item previo para esta carpeta.")
     print("Creando item nuevo en Supabase...\n")
 
     response = supabase.table("items").insert(payload).execute()
     return "created", response.data
 
 
-# =========================
-# MANUAL REVIEW
-# =========================
+def mark_folder_for_manual_review(folder: dict, images: list[dict], reason: str, confidence=None):
+    image_ids = [img["id"] for img in images]
+    signature = build_product_folder_signature(folder, images)
 
-def mark_group_for_manual_review(group, reason, confidence=None, resolved_groups=None, unassigned_ids=None):
-    image_ids = [file["id"] for file in group]
-    signature = build_group_signature(group)
-
-    print("Marcando grupo para revisión manual...\n")
+    print("Marcando carpeta para revisión manual...\n")
 
     upsert_cache_record(
         group_signature=signature,
         status="manual_review_required",
         image_ids=image_ids,
-        resolved_groups=resolved_groups,
-        unassigned_image_ids=unassigned_ids,
-        reason=reason,
+        resolved_groups=[],
+        unassigned_image_ids=image_ids,
+        reason=f"{folder['name']}: {reason}",
         confidence=confidence,
     )
 
 
 # =========================
-# PROCESS ONE GROUP
+# PROCESS PRODUCT FOLDER
 # =========================
 
-def process_group(service, group, group_index):
-    print("=" * 70)
-    print(f"PROCESANDO GRUPO {group_index}\n")
+def process_product_folder(service, folder: dict):
+    print_section(f"PROCESANDO CARPETA: {folder['name']}")
 
-    print("Imágenes del grupo:")
-    for idx, file in enumerate(group):
-        print(f"{idx}: {file['name']} | id={file['id']} | sort_time={file['sort_time']}")
+    images = list_images_in_folder(service, folder["id"])
+
+    if not images:
+        print("La carpeta no tiene imágenes. Se omite.\n")
+        return
+
+    print(f"Imágenes encontradas en carpeta: {len(images)}")
+    for idx, img in enumerate(images):
+        print(f"{idx}: {img['name']} | id={img['id']}")
     print()
 
-    signature = build_group_signature(group)
-    image_ids = [file["id"] for file in group]
+    signature = build_product_folder_signature(folder, images)
+    image_ids = [img["id"] for img in images]
 
     cache_record = get_cache_record(signature)
 
     if cache_record:
         cache_status = cache_record.get("status")
-        print(f"Cache encontrado para este grupo: {cache_status}\n")
+        print(f"Cache encontrado para carpeta: {cache_status}\n")
 
         if cache_status == "processed":
-            print("Este grupo ya fue procesado antes. Se omite.\n")
+            print("Esta carpeta ya fue procesada antes. Se omite.\n")
             return
 
         if cache_status == "manual_review_required":
-            print("Este grupo ya quedó marcado para revisión manual. Se omite.\n")
+            print("Esta carpeta ya está marcada para revisión manual. Se omite.\n")
             return
 
-        if cache_status == "reagrouped_processed":
-            resolved_groups = cache_record.get("resolved_groups") or []
-            print("Usando reagrupación guardada en cache.\n")
+    existing_item = find_existing_item_by_images(build_image_data(images))
 
-            for i, id_group in enumerate(resolved_groups, start=1):
-                new_group = [file for file in group if file["id"] in id_group]
-
-                if not new_group:
-                    continue
-
-                print(f"\n--- Subgrupo cacheado {group_index}.{i} ---\n")
-                process_group(service, new_group, f"{group_index}.{i}")
-
-            return
-
-    existing_item = find_existing_item_by_images(build_image_data(group))
     if existing_item and item_is_complete(existing_item):
-        print(f"Item completo ya existente para este grupo: {existing_item['id']}")
+        print(f"Item completo ya existente: {existing_item['id']}")
         print("Se marca como processed en cache y se omite IA.\n")
 
         upsert_cache_record(
             group_signature=signature,
             status="processed",
             image_ids=image_ids,
+            resolved_groups=[image_ids],
             reason="Item completo ya existente en Supabase",
             confidence=1.0,
         )
         return
 
-    validation = validate_group_with_ai(service, group)
+    validation = validate_folder_product_with_ai(service, folder, images)
+    confidence = float(validation.get("confidence") or 0)
 
-    confidence = float(validation["same_item_confidence"])
-    likely = bool(validation["same_item_likely"])
-    reason = validation["reason"]
-
-    # IMPORTANTE:
-    # si likely es False, NO se acepta nunca como un solo producto.
-    if not likely:
-        print("La IA indica que este grupo NO corresponde a un solo producto.\n")
-        print("Se intentará reagrupación automática.\n")
-
-        raw_split_groups = split_group_with_ai(service, group)
-        split_groups = sanitize_split_groups_by_ids(raw_split_groups, group)
-
-        assigned_ids = {image_id for subgroup in split_groups for image_id in subgroup}
-        original_ids = set(image_ids)
-        unassigned_ids = sorted(list(original_ids - assigned_ids))
-
-        if not split_groups:
-            print("La reagrupación no devolvió subgrupos válidos.\n")
-            mark_group_for_manual_review(
-                group=group,
-                reason=f"Grupo mezclado detectado. Reagrupación IA inválida. Motivo IA: {reason}",
-                confidence=confidence,
-                resolved_groups=[],
-                unassigned_ids=image_ids,
-            )
-            return
-
-        if unassigned_ids:
-            print("La reagrupación dejó imágenes sin asignar. Se marca revisión manual.\n")
-            print(f"Imágenes sin asignar: {unassigned_ids}\n")
-
-            mark_group_for_manual_review(
-                group=group,
-                reason=f"Grupo mezclado detectado. Reagrupación incompleta. Motivo IA: {reason}",
-                confidence=confidence,
-                resolved_groups=split_groups,
-                unassigned_ids=unassigned_ids,
-            )
-            return
-
-        print("Reagrupación válida. Se guardará en cache y se procesarán subgrupos.\n")
-
-        upsert_cache_record(
-            group_signature=signature,
-            status="reagrouped_processed",
-            image_ids=image_ids,
-            resolved_groups=split_groups,
-            unassigned_image_ids=[],
-            reason=f"Grupo mezclado resuelto por IA. Motivo IA: {reason}",
-            confidence=confidence,
+    if (
+        not validation.get("is_single_product")
+        or confidence < VALIDATION_CONFIDENCE_MIN
+        or not validation.get("same_category_likely")
+        or not validation.get("label_color_matches_product")
+        or float(validation.get("fabric_match_confidence") or 0) < FABRIC_MATCH_MIN
+    ):
+        reason = (
+            "Validación rechazó carpeta. "
+            f"confidence={confidence}. "
+            f"fabric_match={validation.get('fabric_match_confidence')}. "
+            f"reason={validation.get('reason')}"
         )
-
-        for i, id_group in enumerate(split_groups, start=1):
-            new_group = [file for file in group if file["id"] in id_group]
-
-            if not new_group:
-                continue
-
-            print(f"\n--- Subgrupo {group_index}.{i} ---\n")
-            process_group(service, new_group, f"{group_index}.{i}")
-
+        print(reason)
+        mark_folder_for_manual_review(folder, images, reason=reason, confidence=confidence)
         return
 
-    print(
-        f"Grupo aceptado para catalogación automática "
-        f"(same_item_likely={likely}, confidence={confidence}).\n"
-    )
+    try:
+        ai_result = analyze_folder_product_with_ai(service, folder, images)
+    except Exception as e:
+        mark_folder_for_manual_review(
+            folder,
+            images,
+            reason=f"Análisis final falló o detectó múltiples productos: {e}",
+            confidence=confidence,
+        )
+        return
 
-    ai_result = analyze_group_with_ai(service, group)
+    action, saved_data = save_item_to_supabase(folder, images, ai_result)
 
-    print("RESULTADO IA:\n")
-    print(json.dumps(ai_result, indent=2, ensure_ascii=False))
-    print()
-
-    action, saved_data = save_item_to_supabase(group, ai_result)
-
-    print(f"ACCIÓN EN SUPABASE: {action.upper()}\n")
+    print(f"ACCIÓN EN SUPABASE: {action.upper()}")
     print(json.dumps(saved_data, indent=2, ensure_ascii=False))
     print()
 
@@ -864,8 +918,9 @@ def process_group(service, group, group_index):
         group_signature=signature,
         status="processed",
         image_ids=image_ids,
-        reason="Grupo procesado correctamente",
-        confidence=1.0,
+        resolved_groups=[image_ids],
+        reason="Carpeta de producto procesada correctamente",
+        confidence=confidence,
     )
 
 
@@ -874,40 +929,25 @@ def process_group(service, group, group_index):
 # =========================
 
 def main():
-    service = get_drive_service()
-    files = get_images(service)
+    print_section("INGEST LÉ SANG — MODO CARPETAS POR PRODUCTO")
 
-    if not files:
-        print("No se encontraron imágenes.")
+    service = get_drive_service()
+    product_folders = list_product_folders(service)
+
+    if not product_folders:
+        print("No se encontraron subcarpetas de producto.")
+        print("Crea carpetas dentro de la carpeta principal de Drive. Cada carpeta debe representar 1 producto.")
         return
 
-    print("Imágenes encontradas:\n")
-    for file in files:
-        capture_time = (file.get("imageMediaMetadata") or {}).get("time")
-        print(
-            f"- {file['name']} | "
-            f"id={file['id']} | "
-            f"capture_time={capture_time or 'N/A'} | "
-            f"drive_created={file['createdTime']} | "
-            f"sort_time={file['sort_time']}"
-        )
+    print("Carpetas detectadas:")
+    for folder in product_folders:
+        print(f"- {folder['name']} | id={folder['id']}")
     print()
 
-    groups = group_images(files)
+    for folder in product_folders:
+        process_product_folder(service, folder)
 
-    if not groups:
-        print("No hay grupos.")
-        return
-
-    print("Grupos detectados:\n")
-    for i, group in enumerate(groups, start=1):
-        print(f"Grupo {i}:")
-        for file in group:
-            print(f"  - {file['name']} | id={file['id']}")
-        print()
-
-    for i, group in enumerate(groups, start=1):
-        process_group(service, group, i)
+    print_section("INGEST FINALIZADO")
 
 
 if __name__ == "__main__":
