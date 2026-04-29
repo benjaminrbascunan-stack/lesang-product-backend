@@ -29,7 +29,7 @@ TOKEN_PATH = BASE_DIR / "token.json"
 
 load_dotenv(dotenv_path=ENV_PATH, override=True)
 
-DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 
 def clean_env(value: str | None) -> str:
