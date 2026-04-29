@@ -275,7 +275,7 @@ def status():
 
 @app.post("/run-group")
 def run_group():
-    ok, message = start_script("auto_group_to_drive.py")
+    ok, message = start_script("auto_group_to_drive_v2.py")
     return JSONResponse({"ok": ok, "message": message})
 
 
