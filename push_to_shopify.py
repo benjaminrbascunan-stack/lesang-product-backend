@@ -16,20 +16,15 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 SHOPIFY_STORE_DOMAIN = os.getenv("SHOPIFY_STORE_DOMAIN")
-SHOPIFY_ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
+SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID")
+SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET")
 
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Faltan credenciales de Supabase")
-
-if not SHOPIFY_STORE_DOMAIN or not SHOPIFY_ACCESS_TOKEN:
-    raise ValueError("Faltan credenciales de Shopify")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ===============================
-# GOOGLE DRIVE (NUBE)
+# GOOGLE DRIVE
 # ===============================
 
 def get_drive_creds():
@@ -49,7 +44,33 @@ def get_drive_creds():
     return creds
 
 # ===============================
-# SUPABASE ITEMS
+# SHOPIFY TOKEN DINÁMICO
+# ===============================
+
+def get_shopify_token():
+    print("Generando token Shopify...")
+
+    url = f"https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token"
+
+    response = requests.post(
+        url,
+        data={
+            "grant_type": "client_credentials",
+            "client_id": SHOPIFY_CLIENT_ID,
+            "client_secret": SHOPIFY_CLIENT_SECRET
+        }
+    )
+
+    data = response.json()
+
+    if "access_token" not in data:
+        raise RuntimeError(data)
+
+    print("✔ Token Shopify generado")
+    return data["access_token"]
+
+# ===============================
+# FETCH ITEMS
 # ===============================
 
 def fetch_items():
@@ -64,7 +85,7 @@ def fetch_items():
 # CREATE PRODUCT
 # ===============================
 
-def create_product(item):
+def create_product(item, token):
     print(f"Creando producto: {item['title']}")
 
     url = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/2024-04/products.json"
@@ -89,7 +110,7 @@ def create_product(item):
     response = requests.post(
         url,
         headers={
-            "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
+            "X-Shopify-Access-Token": token,
             "Content-Type": "application/json"
         },
         json=payload
@@ -104,10 +125,10 @@ def create_product(item):
     return data["product"]["id"]
 
 # ===============================
-# SUBIR IMÁGENES
+# UPLOAD IMAGES
 # ===============================
 
-def upload_images(product_id, image_urls):
+def upload_images(product_id, image_urls, token):
     if not image_urls:
         print("⚠️ Sin imágenes")
         return
@@ -120,13 +141,11 @@ def upload_images(product_id, image_urls):
         requests.post(
             url,
             headers={
-                "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
+                "X-Shopify-Access-Token": token,
                 "Content-Type": "application/json"
             },
             json={
-                "image": {
-                    "src": img
-                }
+                "image": {"src": img}
             }
         )
 
@@ -136,10 +155,12 @@ def upload_images(product_id, image_urls):
 
 def main():
     print("=" * 80)
-    print("PUSH TO SHOPIFY — FULL CLOUD VERSION")
+    print("PUSH TO SHOPIFY — DYNAMIC TOKEN VERSION")
     print("=" * 80)
 
     get_drive_creds()
+
+    token = get_shopify_token()
 
     items = fetch_items()
 
@@ -151,10 +172,10 @@ def main():
 
     for item in items:
         try:
-            product_id = create_product(item)
+            product_id = create_product(item, token)
 
             image_urls = item.get("images", [])
-            upload_images(product_id, image_urls)
+            upload_images(product_id, image_urls, token)
 
         except Exception as e:
             print(f"Error: {e}")
