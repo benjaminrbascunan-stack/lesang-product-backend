@@ -109,7 +109,7 @@ mutation publishProduct($id: ID!, $input: [PublicationInput!]!) {
 """
 
 ACTIVATE_PRODUCT_MUTATION = """
-mutation activateProduct($id: ID!, $input: ProductInput!) {
+mutation activateProduct($input: ProductUpdateInput!) {
   productUpdate(product: $input) {
     product {
       id
@@ -128,7 +128,6 @@ def activate_product(product: dict, token: str) -> bool:
     data = shopify_graphql(
         query=ACTIVATE_PRODUCT_MUTATION,
         variables={
-            "id": product["id"],
             "input": {
                 "id":     product["id"],
                 "status": "ACTIVE",
