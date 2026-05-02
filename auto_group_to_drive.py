@@ -33,9 +33,6 @@ SUPABASE_KEY   = os.getenv("SUPABASE_KEY")
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-# ── Cambiá este ID según qué carpeta querés procesar ──────────────────────────
-# Para reprocesar REVISAR: pegá el ID de esa carpeta (lo encontrás en la URL de Drive)
-# Para un batch nuevo: pegá el ID de la carpeta nueva
 FOLDER_ID = "1yfADUnnIXsCTqRI7wcZ6ctao60VHXu-R"
 
 IMAGE_CACHE_BUCKET = "ai-image-cache"
@@ -43,24 +40,49 @@ IMAGE_CACHE_BUCKET = "ai-image-cache"
 PAIR_MAX_SIZE  = 1024
 PAIR_QUALITY   = 78
 
-GROUP_VALIDATION_MAX_SIZE = 1024
-GROUP_VALIDATION_QUALITY  = 78
+GROUP_VALIDATION_MAX_SIZE = 768   # 768px suficiente para detectar mezclas
+GROUP_VALIDATION_QUALITY  = 72
 
 NAME_MAX_SIZE = 1024
 NAME_QUALITY  = 78
 
-# ── Umbrales ──────────────────────────────────────────────────────────────────
 PAIR_SAME_THRESHOLD        = 85
 PAIR_REVIEW_THRESHOLD      = 80
 GROUP_VALIDATION_THRESHOLD = 85
+LARGE_GROUP_SIZE           = 8
 
-# Corte forzado si un grupo supera este tamaño
-# Con productos de menos de 5 fotos no debería activarse
-LARGE_GROUP_SIZE = 8
-
-# ── Carpetas de salida ────────────────────────────────────────────────────────
 CREATE_REVIEW_FOLDER = True
 REVIEW_FOLDER_NAME   = "REVISAR"
+
+# =========================
+# COSTO ESTIMADO gpt-4o
+# Input:  $2.50  / 1M tokens
+# Output: $10.00 / 1M tokens
+# Imagen 1024px ≈ 1700 tokens de imagen
+# =========================
+COST_INPUT_PER_TOKEN  = 2.50  / 1_000_000
+COST_OUTPUT_PER_TOKEN = 10.00 / 1_000_000
+COST_IMAGE_TOKENS     = 1700  # tokens por imagen 1024px aprox
+
+# Acumulador global de costo
+_total_cost_usd = 0.0
+_total_calls    = 0
+
+
+def add_cost(n_images: int, model: str = "gpt-4o"):
+    global _total_cost_usd, _total_calls
+    # Estimado: tokens de imagen + ~300 tokens de texto input + ~100 output
+    input_tokens  = n_images * COST_IMAGE_TOKENS + 300
+    output_tokens = 100
+    cost = (input_tokens * COST_INPUT_PER_TOKEN) + (output_tokens * COST_OUTPUT_PER_TOKEN)
+    _total_cost_usd += cost
+    _total_calls += 1
+    return cost
+
+
+def print_cost(label: str, cost: float):
+    print(f"  💰 {label}: ~${cost:.4f} USD | acumulado: ~${_total_cost_usd:.4f} USD ({_total_calls} llamadas)")
+
 
 if not OPENAI_API_KEY:
     raise ValueError("Falta OPENAI_API_KEY en .env")
@@ -129,25 +151,14 @@ def get_drive_service():
 
     creds = None
 
-    # ===============================
-    # MODO NUBE (Railway)
-    # ===============================
     token_json = os.getenv("GOOGLE_TOKEN_JSON")
 
     if token_json:
         print("Usando autenticación desde variables (nube)...")
-
-        creds = Credentials.from_authorized_user_info(
-            json.loads(token_json),
-            SCOPES
-        )
-
+        creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
         print("✔ Google Drive conectado (nube)\n")
         return build("drive", "v3", credentials=creds)
 
-    # ===============================
-    # MODO LOCAL (tu código original)
-    # ===============================
     print("Usando autenticación local...")
 
     from google.auth.transport.requests import Request
@@ -164,12 +175,12 @@ def get_drive_service():
             print("Abriendo autenticación de Google...")
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
-
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
     print("✔ Google Drive conectado (local)\n")
     return build("drive", "v3", credentials=creds)
+
 
 # =========================
 # DRIVE FILES
@@ -386,8 +397,9 @@ Para denim, ante cualquier duda → cortar siempre.
 Responde SOLO JSON, sin texto adicional, sin markdown."""
 
 
-def compare_pair_with_ai(service, left: dict, right: dict) -> dict:
+def compare_pair_with_ai(service, left: dict, right: dict, pair_index: int, total_pairs: int) -> dict:
     print_section(f"COMPARANDO PAR: {left['name']} → {right['name']}")
+    print(f"PROGRESS: {pair_index} / {total_pairs}")
 
     image_inputs = build_openai_image_inputs(
         service=service,
@@ -449,6 +461,8 @@ def compare_pair_with_ai(service, left: dict, right: dict) -> dict:
     result = json.loads(response.output_text)
     result["confianza"] = clamp_confidence(result.get("confianza"))
 
+    cost = add_cost(n_images=2)
+    print_cost("comparación par", cost)
     print("Resultado par:")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print()
@@ -457,12 +471,13 @@ def compare_pair_with_ai(service, left: dict, right: dict) -> dict:
 
 def run_pairwise_comparisons(service, images: list[dict]) -> list[dict]:
     print_section("ETAPA 1 — COMPARACIÓN DE PARES CONSECUTIVOS")
-    decisions = []
+    decisions  = []
+    total_pairs = len(images) - 1
 
-    for i in range(len(images) - 1):
+    for i in range(total_pairs):
         left   = images[i]
         right  = images[i + 1]
-        result = compare_pair_with_ai(service, left, right)
+        result = compare_pair_with_ai(service, left, right, pair_index=i + 1, total_pairs=total_pairs)
 
         decisions.append({
             "index":                 i,
@@ -600,10 +615,14 @@ El sistema las separará automáticamente sin mandar todo el grupo a revisión.
 Responde SOLO JSON, sin texto adicional, sin markdown."""
 
 
-def validate_candidate_group_with_ai(service, group: dict) -> dict:
+def validate_candidate_group_with_ai(
+    service, group: dict, group_index: int, total_groups: int, model: str = "gpt-4o"
+) -> dict:
     images = group["images"]
-    print_section("ETAPA 3 — VALIDACIÓN DE GRUPO")
-    print("Validando grupo:")
+    model_tag = "mini" if model == "gpt-4o-mini" else "4o"
+    print_section(f"ETAPA 3 — VALIDANDO GRUPO {group_index} / {total_groups} [{model_tag}]")
+    print(f"PROGRESS: {group_index} / {total_groups}")
+    print("Fotos del grupo:")
     for image in images:
         print(f"- {image['name']} | id={image['id']}")
 
@@ -616,7 +635,7 @@ def validate_candidate_group_with_ai(service, group: dict) -> dict:
     lines = [f"{i}: {img['name']} | id={img['id']}" for i, img in enumerate(images)]
 
     response = client.responses.create(
-        model="gpt-4o",
+        model=model,
         instructions=GROUP_VALIDATION_INSTRUCTIONS,
         input=[
             {
@@ -674,28 +693,22 @@ def validate_candidate_group_with_ai(service, group: dict) -> dict:
     result = json.loads(response.output_text)
     result["confianza"] = clamp_confidence(result.get("confianza"))
 
-    print("Resultado validación grupo:")
+    cost = add_cost(n_images=len(images))
+    print_cost(f"validación grupo ({len(images)} fotos)", cost)
+    print("Resultado validación:")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print()
     return result
 
 
 def try_split_group(group: dict, validation: dict) -> list[dict]:
-    """
-    Tres niveles de split:
-    1. Pocas fotos sospechosas (1-2): separarlas, aprobar el resto.
-    2. Subgrupos claros del validador: subdividir por producto.
-    3. Sin info suficiente: todo a REVISAR.
-    """
     suspicious_ids    = validation.get("suspicious_image_ids") or []
     subgrupos_indices = validation.get("subgrupos_indices") or []
     images            = group["images"]
 
-    # Nivel 1: 1-2 fotos sospechosas → split liviano
     if 0 < len(suspicious_ids) <= 2:
         clean   = [img for img in images if img["id"] not in suspicious_ids]
         suspect = [img for img in images if img["id"] in suspicious_ids]
-
         print(f"  → Split liviano: {len(clean)} fotos aprobadas, {len(suspect)} a REVISAR.")
         result = []
         if clean:
@@ -704,7 +717,6 @@ def try_split_group(group: dict, validation: dict) -> list[dict]:
             result.append({**group, "images": suspect, "needs_review": True, "auto_split": True})
         return result
 
-    # Nivel 2: subgrupos del validador
     subgrupos_validos = [sg for sg in subgrupos_indices if len(sg) >= 1]
     if len(subgrupos_validos) >= 2:
         print(f"  → Subdividiendo en {len(subgrupos_validos)} subgrupos.")
@@ -727,14 +739,16 @@ def try_split_group(group: dict, validation: dict) -> list[dict]:
             print(f"    Subgrupo {i+1}: {[img['name'] for img in sub_images]}")
         return subgroups if subgroups else [group]
 
-    # Nivel 3: sin info → todo a REVISAR
     print("  → Sin subgrupos claros. Grupo completo va a REVISAR.")
     group["needs_review"] = True
     return [group]
 
 
 def validate_all_groups(service, candidate_groups: list[dict]) -> list[dict]:
-    validated = []
+    validated     = []
+    groups_to_val = [g for g in candidate_groups if g["review_flag"] or len(g["images"]) > 2]
+    total_to_val  = len(groups_to_val)
+    val_counter   = 0
 
     for group in candidate_groups:
         should_validate = group["review_flag"] or len(group["images"]) > 2
@@ -751,7 +765,25 @@ def validate_all_groups(service, candidate_groups: list[dict]) -> list[dict]:
             validated.append(group)
             continue
 
-        validation          = validate_candidate_group_with_ai(service, group)
+        val_counter += 1
+
+        # Modelo dinámico según confianza:
+        # - confianza alta (>=90) y sin review_flag → gpt-4o-mini (15x más barato)
+        # - confianza baja o review_flag → gpt-4o (máxima precisión)
+        avg_conf = group["pair_confidence_avg"]
+        use_model = (
+            "gpt-4o-mini"
+            if avg_conf >= 90 and not group["review_flag"]
+            else "gpt-4o"
+        )
+        print(f"  Confianza promedio pares: {avg_conf:.1f} → usando {use_model}")
+
+        validation   = validate_candidate_group_with_ai(
+            service, group,
+            group_index=val_counter,
+            total_groups=total_to_val,
+            model=use_model,
+        )
         group["validation"] = validation
 
         is_valid   = validation.get("grupo_valido", False)
@@ -788,9 +820,11 @@ NAME_INSTRUCTIONS = (
 
 
 def propose_folder_name_with_ai(
-    service, images: list[dict], index: int, needs_review: bool
+    service, images: list[dict], index: int, needs_review: bool,
+    folder_index: int, total_folders: int,
 ) -> str:
-    print_section("PROPONIENDO NOMBRE DE CARPETA")
+    print_section(f"NOMBRE DE CARPETA {folder_index} / {total_folders}")
+    print(f"PROGRESS: {folder_index} / {total_folders}")
 
     image_inputs = build_openai_image_inputs(
         service=service,
@@ -801,7 +835,7 @@ def propose_folder_name_with_ai(
     lines = [f"{i}: {img['name']} | id={img['id']}" for i, img in enumerate(images)]
 
     response = client.responses.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         instructions=NAME_INSTRUCTIONS,
         input=[
             {
@@ -834,6 +868,9 @@ def propose_folder_name_with_ai(
     )
 
     result = json.loads(response.output_text)
+    cost   = add_cost(n_images=len(images))
+    print_cost(f"nombre carpeta (mini, {len(images)} fotos)", cost)
+
     base   = sanitize_folder_name(result.get("folder_name") or "producto")
     prefix = "REVISAR" if needs_review else f"{index:03d}"
     return f"{prefix} {base}"
@@ -852,8 +889,9 @@ def create_folders_from_groups(service, groups: list[dict]):
 
     product_index = 1
     review_index  = 1
+    total_groups  = len(groups)
 
-    for group in groups:
+    for folder_index, group in enumerate(groups, start=1):
         images       = group["images"]
         validation   = group.get("validation") or {}
         needs_review = bool(group.get("needs_review"))
@@ -864,6 +902,8 @@ def create_folders_from_groups(service, groups: list[dict]):
             images=images,
             index=product_index if not needs_review else review_index,
             needs_review=needs_review,
+            folder_index=folder_index,
+            total_folders=total_groups,
         )
 
         if needs_review:
@@ -933,13 +973,18 @@ def print_metrics(images: list[dict], pair_decisions: list[dict], groups: list[d
         names     = [img["name"] for img in g["images"]]
         print(f"  {i}: {len(g['images'])} fotos | {status}{split_tag} | {names}")
 
+    print(f"\n{'='*80}")
+    print(f"  💰 COSTO TOTAL ESTIMADO: ~${_total_cost_usd:.4f} USD")
+    print(f"  📞 LLAMADAS A LA API:     {_total_calls}")
+    print(f"{'='*80}")
+
 
 # =========================
 # MAIN
 # =========================
 
 def main():
-    print_section("AUTO GROUP TO DRIVE — v3 (etiquetas + denim)")
+    print_section("AUTO GROUP TO DRIVE — v4 (progreso + costo en vivo)")
     print(f"Carpeta objetivo: {FOLDER_ID}")
     print("Para cambiar la carpeta, editá FOLDER_ID en la sección CONFIG.\n")
 
@@ -948,7 +993,6 @@ def main():
 
     if not images:
         print("No hay imágenes sueltas para agrupar.")
-        print("Si querés procesar otra carpeta, cambiá FOLDER_ID en CONFIG.")
         return
 
     print("Imágenes sueltas detectadas:")
@@ -969,9 +1013,10 @@ def main():
     create_folders_from_groups(service, validated_groups)
 
     print_section("FINALIZADO")
-    print("→ Carpetas aprobadas listas en Drive.")
+    print(f"💰 Costo total estimado del batch: ~${_total_cost_usd:.4f} USD")
+    print(f"📞 Total llamadas a OpenAI: {_total_calls}")
+    print("\n→ Carpetas aprobadas listas en Drive.")
     print("→ Dudosas en REVISAR/ | Subdivididas con [SPLIT]")
-    print("→ Para procesar otra carpeta, cambiá FOLDER_ID en CONFIG.")
     print("\nCuando las carpetas estén correctas, corré: python3 ingest.py")
 
 

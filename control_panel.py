@@ -498,6 +498,15 @@ HTML = """<!DOCTYPE html>
         <span class="btn-arrow">→</span>
       </button>
 
+      <button class="action-btn" id="btn-activate" onclick="run('/run-activate', 'btn-activate', 'ACTIVAR')">
+        <div class="btn-left">
+          <span class="btn-num">04</span>
+          <span class="btn-label">ACTIVAR</span>
+          <span class="btn-sub">Publicar drafts en Online Store + POS</span>
+        </div>
+        <span class="btn-arrow">→</span>
+      </button>
+
     </div>
   </div>
 
@@ -608,13 +617,13 @@ HTML = """<!DOCTYPE html>
 
   // ── BOTONES ──
   function setAllDisabled(disabled) {
-    ['btn-group','btn-ingest','btn-shopify'].forEach(id => {
+    ['btn-group','btn-ingest','btn-shopify','btn-activate'].forEach(id => {
       document.getElementById(id).disabled = disabled;
     });
   }
 
   function setActive(btnId) {
-    ['btn-group','btn-ingest','btn-shopify'].forEach(id => {
+    ['btn-group','btn-ingest','btn-shopify','btn-activate'].forEach(id => {
       document.getElementById(id).classList.remove('active');
     });
     if (btnId) document.getElementById(btnId).classList.add('active');
@@ -764,3 +773,9 @@ def get_publications():
     )
 
     return res.json()
+
+
+@app.post("/run-activate")
+def run_activate():
+    ok, message = start_script("publish_channels.py")
+    return JSONResponse({"ok": ok, "message": message})
