@@ -1,7 +1,9 @@
 import re
+import os
 import subprocess
 import threading
 from pathlib import Path
+import requests
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -458,7 +460,7 @@ HTML = """<!DOCTYPE html>
 <body>
 
 <header>
-  <img src="https://cdn.shopify.com/s/files/1/0862/4262/3795/files/logo.png?v=1776360657" style="height:80px; display:block;" />
+  <div class="logo">LÉ SANG</div>
   <div class="header-center">PANEL DE OPERACIONES</div>
   <div class="header-right" id="clock">—</div>
 </header>
@@ -724,3 +726,41 @@ def run_ingest():
 def run_shopify():
     ok, message = start_script("push_to_shopify.py")
     return JSONResponse({"ok": ok, "message": message})
+
+
+@app.get("/publications")
+def get_publications():
+    domain = os.getenv("SHOPIFY_STORE_DOMAIN", "").strip().strip('"').strip("'")
+    domain = domain.replace("https://", "").replace("http://", "").rstrip("/")
+    client_id = os.getenv("SHOPIFY_CLIENT_ID", "").strip().strip('"').strip("'")
+    client_secret = os.getenv("SHOPIFY_CLIENT_SECRET", "").strip().strip('"').strip("'")
+
+    token_res = requests.post(
+        f"https://{domain}/admin/oauth/access_token",
+        data={
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+        },
+        timeout=30,
+    )
+
+    if token_res.status_code >= 400:
+        return JSONResponse({"error": token_res.text}, status_code=400)
+
+    token = token_res.json().get("access_token")
+
+    if not token:
+        return JSONResponse({"error": "No se pudo obtener token", "response": token_res.json()}, status_code=400)
+
+    res = requests.post(
+        f"https://{domain}/admin/api/2026-04/graphql.json",
+        headers={
+            "X-Shopify-Access-Token": token,
+            "Content-Type": "application/json",
+        },
+        json={"query": "{ publications(first: 10) { nodes { id name } } }"},
+        timeout=30,
+    )
+
+    return res.json()
