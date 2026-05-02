@@ -108,6 +108,46 @@ mutation publishProduct($id: ID!, $input: [PublicationInput!]!) {
 }
 """
 
+ACTIVATE_PRODUCT_MUTATION = """
+mutation activateProduct($id: ID!, $input: ProductInput!) {
+  productUpdate(product: $input) {
+    product {
+      id
+      title
+      status
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+"""
+
+def activate_product(product: dict, token: str) -> bool:
+    data = shopify_graphql(
+        query=ACTIVATE_PRODUCT_MUTATION,
+        variables={
+            "id": product["id"],
+            "input": {
+                "id":     product["id"],
+                "status": "ACTIVE",
+            },
+        },
+        token=token,
+    )
+
+    result      = data.get("data", {}).get("productUpdate", {})
+    user_errors = result.get("userErrors", [])
+
+    if user_errors:
+        print(f"  ✘ Error activando: {json.dumps(user_errors, ensure_ascii=False)}")
+        return False
+
+    print(f"  ✔ Activado: {product['title']}")
+    return True
+
+
 def fetch_all_draft_products(token: str) -> list[dict]:
     print_section("BUSCANDO PRODUCTOS EN DRAFT")
     products = []
@@ -156,7 +196,7 @@ def publish_product_to_channels(product: dict, token: str) -> bool:
     return True
 
 def main():
-    print_section("ACTIVAR PRODUCTOS — ONLINE STORE + POS")
+    print_section("ACTIVAR PRODUCTOS — ONLINE STORE + POS + ACTIVE")
 
     token    = get_shopify_access_token()
     products = fetch_all_draft_products(token)
@@ -165,7 +205,7 @@ def main():
         print("No hay productos en draft para activar.")
         return
 
-    print_section("PUBLICANDO EN CANALES DE VENTA")
+    print_section("PUBLICANDO EN CANALES + ACTIVANDO")
 
     success = 0
     errors  = 0
@@ -174,8 +214,11 @@ def main():
     for i, product in enumerate(products, start=1):
         print(f"\nPROGRESS: {i} / {total}")
         print(f"Procesando: {product['title']}")
-        ok = publish_product_to_channels(product, token)
-        if ok:
+
+        ok_publish  = publish_product_to_channels(product, token)
+        ok_activate = activate_product(product, token) if ok_publish else False
+
+        if ok_publish and ok_activate:
             success += 1
         else:
             errors += 1
