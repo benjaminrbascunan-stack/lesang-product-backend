@@ -56,7 +56,7 @@ CREATE_REVIEW_FOLDER = True
 REVIEW_FOLDER_NAME   = "REVISAR"
 
 # ── Rate limit y checkpoint ───────────────────────────────────────────────────
-PAIR_DELAY_SECONDS = 1.5
+PAIR_DELAY_SECONDS = 4.0
 CHECKPOINT_FILE    = "/tmp/auto_group_checkpoint.json"
 
 # =========================
@@ -889,7 +889,7 @@ def validate_all_groups(service, candidate_groups: list[dict]) -> list[dict]:
                 else:
                     raise
 
-        time.sleep(1.5)  # delay entre validaciones
+        time.sleep(4.0)  # delay entre validaciones
         group["validation"] = validation
 
         is_valid   = validation.get("grupo_valido", False)
