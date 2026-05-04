@@ -4,6 +4,7 @@ import os
 import re
 import json
 import base64
+import time
 from io import BytesIO
 
 
@@ -53,6 +54,10 @@ LARGE_GROUP_SIZE           = 8
 
 CREATE_REVIEW_FOLDER = True
 REVIEW_FOLDER_NAME   = "REVISAR"
+
+# ── Rate limit y checkpoint ───────────────────────────────────────────────────
+PAIR_DELAY_SECONDS = 1.5
+CHECKPOINT_FILE    = "/tmp/auto_group_checkpoint.json"
 
 # =========================
 # COSTO ESTIMADO gpt-4o
@@ -135,6 +140,57 @@ def clamp_confidence(value) -> float:
     if v <= 1:
         v = v * 100
     return max(0.0, min(100.0, v))
+
+
+# =========================
+# CHECKPOINT
+# =========================
+
+def save_checkpoint(decisions: list[dict], images: list[dict]):
+    """Guarda el progreso de comparaciones al disco."""
+    data = {
+        "decisions":  decisions,
+        "image_ids":  [img["id"] for img in images],
+        "timestamp":  time.time(),
+    }
+    with open(CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print(f"  💾 Checkpoint guardado: {len(decisions)} comparaciones")
+
+
+def load_checkpoint(images: list[dict]) -> list[dict] | None:
+    """
+    Carga checkpoint si existe y corresponde al mismo batch de imágenes.
+    Retorna las decisions guardadas o None si no hay checkpoint válido.
+    """
+    try:
+        with open(CHECKPOINT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        saved_ids  = data.get("image_ids", [])
+        current_ids = [img["id"] for img in images]
+
+        if saved_ids != current_ids:
+            print("  ⚠ Checkpoint de otro batch — ignorando.")
+            return None
+
+        decisions = data.get("decisions", [])
+        age_min   = (time.time() - data.get("timestamp", 0)) / 60
+
+        print(f"  ✔ Checkpoint encontrado: {len(decisions)} comparaciones ({age_min:.0f} min atrás)")
+        return decisions
+
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
+def clear_checkpoint():
+    """Elimina el checkpoint al terminar exitosamente."""
+    try:
+        os.remove(CHECKPOINT_FILE)
+        print("  🗑 Checkpoint eliminado.")
+    except FileNotFoundError:
+        pass
 
 
 # =========================
@@ -471,13 +527,47 @@ def compare_pair_with_ai(service, left: dict, right: dict, pair_index: int, tota
 
 def run_pairwise_comparisons(service, images: list[dict]) -> list[dict]:
     print_section("ETAPA 1 — COMPARACIÓN DE PARES CONSECUTIVOS")
-    decisions  = []
+
+    # ── Intentar retomar desde checkpoint ─────────────────────────────────────
+    saved = load_checkpoint(images)
+    if saved:
+        already_done = len(saved)
+        total_pairs  = len(images) - 1
+        if already_done >= total_pairs:
+            print(f"✔ Todas las comparaciones ya estaban en checkpoint ({already_done}/{total_pairs})")
+            return saved
+        print(f"  Retomando desde comparación {already_done + 1} / {total_pairs}")
+        decisions = saved
+        start_idx = already_done
+    else:
+        decisions = []
+        start_idx = 0
+
     total_pairs = len(images) - 1
 
-    for i in range(total_pairs):
-        left   = images[i]
-        right  = images[i + 1]
-        result = compare_pair_with_ai(service, left, right, pair_index=i + 1, total_pairs=total_pairs)
+    for i in range(start_idx, total_pairs):
+        left  = images[i]
+        right = images[i + 1]
+
+        # ── Retry automático en caso de rate limit ────────────────────────────
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = compare_pair_with_ai(
+                    service, left, right,
+                    pair_index=i + 1,
+                    total_pairs=total_pairs,
+                )
+                break
+            except Exception as e:
+                if "429" in str(e) or "rate_limit" in str(e).lower():
+                    wait = 15 * (attempt + 1)
+                    print(f"  ⚠ Rate limit — esperando {wait}s antes de reintentar...")
+                    time.sleep(wait)
+                    if attempt == max_retries - 1:
+                        raise
+                else:
+                    raise
 
         decisions.append({
             "index":                 i,
@@ -491,6 +581,11 @@ def run_pairwise_comparisons(service, images: list[dict]) -> list[dict]:
             "es_detalle_o_etiqueta": bool(result.get("es_detalle_o_etiqueta", False)),
             "razon":                 result.get("razon", ""),
         })
+
+        # ── Guardar checkpoint y esperar antes de la próxima llamada ──────────
+        save_checkpoint(decisions, images)
+        if i < total_pairs - 1:
+            time.sleep(PAIR_DELAY_SECONDS)
 
     return decisions
 
@@ -1011,6 +1106,8 @@ def main():
 
     print_metrics(images, pair_decisions, validated_groups)
     create_folders_from_groups(service, validated_groups)
+
+    clear_checkpoint()
 
     print_section("FINALIZADO")
     print(f"💰 Costo total estimado del batch: ~${_total_cost_usd:.4f} USD")
