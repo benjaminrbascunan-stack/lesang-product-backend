@@ -862,9 +862,6 @@ def validate_all_groups(service, candidate_groups: list[dict]) -> list[dict]:
 
         val_counter += 1
 
-        # Modelo dinámico según confianza:
-        # - confianza alta (>=90) y sin review_flag → gpt-4o-mini (15x más barato)
-        # - confianza baja o review_flag → gpt-4o (máxima precisión)
         avg_conf = group["pair_confidence_avg"]
         use_model = (
             "gpt-4o-mini"
@@ -873,12 +870,28 @@ def validate_all_groups(service, candidate_groups: list[dict]) -> list[dict]:
         )
         print(f"  Confianza promedio pares: {avg_conf:.1f} → usando {use_model}")
 
-        validation   = validate_candidate_group_with_ai(
-            service, group,
-            group_index=val_counter,
-            total_groups=total_to_val,
-            model=use_model,
-        )
+        # Retry automático en validación de grupos igual que en pares
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                validation = validate_candidate_group_with_ai(
+                    service, group,
+                    group_index=val_counter,
+                    total_groups=total_to_val,
+                    model=use_model,
+                )
+                break
+            except Exception as e:
+                if "429" in str(e) or "rate_limit" in str(e).lower():
+                    wait = 20 * (attempt + 1)
+                    print(f"  ⚠ Rate limit en validación — esperando {wait}s...")
+                    time.sleep(wait)
+                    if attempt == max_retries - 1:
+                        raise
+                else:
+                    raise
+
+        time.sleep(1.5)  # delay entre validaciones
         group["validation"] = validation
 
         is_valid   = validation.get("grupo_valido", False)
