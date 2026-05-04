@@ -863,11 +863,9 @@ def validate_all_groups(service, candidate_groups: list[dict]) -> list[dict]:
         val_counter += 1
 
         avg_conf = group["pair_confidence_avg"]
-        use_model = (
-            "gpt-4o-mini"
-            if avg_conf >= 90 and not group["review_flag"]
-            else "gpt-4o"
-        )
+        # Usando gpt-4o para validación — tiene límites TPM más altos que mini en tier bajo
+        # Cambiar a lógica dinámica cuando el tier de OpenAI suba a Tier 2+
+        use_model = "gpt-4o"
         print(f"  Confianza promedio pares: {avg_conf:.1f} → usando {use_model}")
 
         # Retry automático en validación de grupos igual que en pares
