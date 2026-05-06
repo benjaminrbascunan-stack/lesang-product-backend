@@ -120,11 +120,32 @@ def start_script(script_name: str):
 # ══════════════════════════════════════════════════════════════════════════════
 # POS — Configuración dinámica
 # ══════════════════════════════════════════════════════════════════════════════
-SHOPIFY_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN", "")
-SHOPIFY_TOKEN  = os.environ.get("SHOPIFY_CLIENT_SECRET", "")
-LOCATION_ID    = os.environ.get("SHOPIFY_LOCATION_NUMERIC_ID", "96183910707")
-SHOPIFY_GQL    = f"https://{SHOPIFY_DOMAIN}/admin/api/2026-04/graphql.json"
-HEADERS_SH     = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "application/json"}
+SHOPIFY_DOMAIN    = os.environ.get("SHOPIFY_STORE_DOMAIN", "").strip().strip('"').strip("'").replace("https://","").replace("http://","").rstrip("/")
+SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "").strip()
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip()
+LOCATION_ID       = os.environ.get("SHOPIFY_LOCATION_NUMERIC_ID", "96183910707")
+SHOPIFY_GQL       = f"https://{SHOPIFY_DOMAIN}/admin/api/2026-04/graphql.json"
+SHOPIFY_TOKEN_URL = f"https://{SHOPIFY_DOMAIN}/admin/oauth/access_token"
+
+
+def get_shopify_token() -> str:
+    """Genera un access token dinámico igual que push_to_shopify.py"""
+    r = requests.post(
+        SHOPIFY_TOKEN_URL,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        data={
+            "grant_type": "client_credentials",
+            "client_id": SHOPIFY_CLIENT_ID,
+            "client_secret": SHOPIFY_CLIENT_SECRET,
+        },
+        timeout=30,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f"Error obteniendo token Shopify: {r.status_code} {r.text[:500]}")
+    token = r.json().get("access_token")
+    if not token:
+        raise RuntimeError(f"Shopify no devolvió access_token: {r.json()}")
+    return token
 
 MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
          "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -185,8 +206,10 @@ class ConfigUpdate(BaseModel):
 
 # ── Shopify helper ────────────────────────────────────────────────────────────
 async def gql(query: str, variables: dict = {}) -> dict:
+    token = get_shopify_token()
+    headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
     async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(SHOPIFY_GQL, headers=HEADERS_SH,
+        r = await c.post(SHOPIFY_GQL, headers=headers,
                          json={"query": query, "variables": variables})
         r.raise_for_status()
         data = r.json()
@@ -246,35 +269,6 @@ def update_pos_config(body: ConfigUpdate):
     if body.com_externo_pct     is not None: POS_CONFIG["com_externo_pct"]     = body.com_externo_pct
     return POS_CONFIG
 
-@app.get("/pos/debug")
-async def pos_debug():
-    import httpx
-    domain = os.environ.get("SHOPIFY_STORE_DOMAIN", "NO CONFIGURADO")
-    token  = os.environ.get("SHOPIFY_CLIENT_SECRET", "NO CONFIGURADO")
-    # Enmascarar token para seguridad
-    token_masked = token[:6] + "..." + token[-4:] if len(token) > 10 else "CORTO/VACÍO"
-    
-    # Probar conexión real a Shopify
-    try:
-        async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.post(
-                f"https://{domain}/admin/api/2026-04/graphql.json",
-                headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
-                json={"query": "{ shop { name } }"}
-            )
-            return {
-                "domain": domain,
-                "token_masked": token_masked,
-                "shopify_status": r.status_code,
-                "shopify_response": r.json()
-            }
-    except Exception as e:
-        return {
-            "domain": domain,
-            "token_masked": token_masked,
-            "error": str(e)
-        }
-    
 @app.get("/pos/products")
 async def pos_get_products():
     query = """query($cursor:String){
