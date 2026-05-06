@@ -4,13 +4,26 @@ import subprocess
 import threading
 from pathlib import Path
 import requests
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from typing import List, Optional
+from pydantic import BaseModel
+import httpx
 
 BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(title="Lé Sang Pipeline Control Panel")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ── Pipeline state ─────────────────────────────────────────────────────────────
 LAST_LOG = ""
 PROGRESS = 0
 STATUS = "idle"
@@ -46,7 +59,6 @@ def parse_progress_from_line(line: str, script_name: str):
             total = getattr(parse_progress_from_line, "total_items", 0)
             current = getattr(parse_progress_from_line, "current_item", 0) + 1
             parse_progress_from_line.current_item = current
-
             if total > 0:
                 percent = int((current / total) * 100)
                 set_progress(percent, line.strip())
@@ -79,14 +91,12 @@ def run_script_thread(script_name: str):
     )
 
     output_lines = []
-
     for line in process.stdout:
         output_lines.append(line)
         LAST_LOG = "".join(output_lines)
         parse_progress_from_line(line, script_name)
 
     process.wait()
-
     LAST_LOG = "".join(output_lines)
 
     if process.returncode == 0:
@@ -100,16 +110,283 @@ def run_script_thread(script_name: str):
 
 def start_script(script_name: str):
     global IS_RUNNING
-
     if IS_RUNNING:
         return False, "Ya hay un proceso corriendo."
-
     thread = threading.Thread(target=run_script_thread, args=(script_name,))
     thread.start()
-
     return True, f"Iniciado: {script_name}"
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# POS — Configuración dinámica
+# ══════════════════════════════════════════════════════════════════════════════
+SHOPIFY_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN", "")
+SHOPIFY_TOKEN  = os.environ.get("SHOPIFY_CLIENT_SECRET", "")
+LOCATION_ID    = os.environ.get("SHOPIFY_LOCATION_NUMERIC_ID", "96183910707")
+SHOPIFY_GQL    = f"https://{SHOPIFY_DOMAIN}/admin/api/2026-04/graphql.json"
+HEADERS_SH     = {"X-Shopify-Access-Token": SHOPIFY_TOKEN, "Content-Type": "application/json"}
+
+MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+         "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+
+POS_CONFIG = {
+    "vendedores": ["Aaron", "Benja R", "Fabio", "Marenna", "Michelle"],
+    "propietarios": ["Tienda", "Aaron", "Benja R", "Fabio", "Consignacion"],
+    "marcas": [
+        {"nombre": "Tienda",         "comision": 0,    "paga_iva": False},
+        {"nombre": "Pop disaster",   "comision": 0.25, "paga_iva": False},
+        {"nombre": "Pedritos",       "comision": 0.25, "paga_iva": False},
+        {"nombre": "Season Archive", "comision": 0.25, "paga_iva": False},
+        {"nombre": "Consignacion",   "comision": 0.25, "paga_iva": False},
+    ],
+    "vendedores_externos": ["Marenna", "Michelle"],
+    "com_externo_pct": 0.05,
+    "com_bancaria": {
+        "Débito": 0.0125, "Crédito": 0.0295,
+        "Transferencia": 0, "Efectivo": 0, "Internet(Shopify)": 0.02,
+    },
+    "iva_tipos": ["Débito", "Crédito"],
+}
+
+
+# ── POS Models ────────────────────────────────────────────────────────────────
+class VentaIn(BaseModel):
+    timestamp:         Optional[str]   = None
+    nombre_prenda:     str
+    talla:             Optional[str]   = "—"
+    propietario:       str
+    vendedor:          str
+    precio_bruto:      float
+    tipo_pago:         str
+    iva:               float
+    pct_com_bancaria:  float
+    com_bancaria:      float
+    base_com_vendedor: float
+    pct_com_vendedor:  float
+    com_vendedor:      float
+    neto_tienda:       float
+    observaciones:     Optional[str]   = ""
+    marca:             str
+    order_name:        Optional[str]   = ""
+    shopify_id:        Optional[str]   = None
+    shopify_variant:   Optional[str]   = None
+
+class VentaUpdate(VentaIn):
+    row_index: int
+    mes:       str
+
+class ConfigUpdate(BaseModel):
+    vendedores:          Optional[List[str]] = None
+    propietarios:        Optional[List[str]] = None
+    marcas:              Optional[list]      = None
+    vendedores_externos: Optional[List[str]] = None
+    com_externo_pct:     Optional[float]     = None
+
+
+# ── Shopify helper ────────────────────────────────────────────────────────────
+async def gql(query: str, variables: dict = {}) -> dict:
+    async with httpx.AsyncClient(timeout=20) as c:
+        r = await c.post(SHOPIFY_GQL, headers=HEADERS_SH,
+                         json={"query": query, "variables": variables})
+        r.raise_for_status()
+        data = r.json()
+        if "errors" in data:
+            raise HTTPException(500, detail=data["errors"])
+        return data["data"]
+
+
+# ── Sheets helpers (lazy import) ──────────────────────────────────────────────
+def sheets_append(venta: dict):
+    try:
+        from pos_sheets import append_venta
+        return append_venta(venta)
+    except Exception as e:
+        print(f"[Sheets] append: {e}")
+        return None
+
+def sheets_get(mes: str):
+    try:
+        from pos_sheets import get_ventas_mes
+        return get_ventas_mes(mes)
+    except Exception as e:
+        print(f"[Sheets] get: {e}")
+        return []
+
+def sheets_update(mes: str, row: int, venta: dict):
+    try:
+        from pos_sheets import update_venta
+        return update_venta(mes, row, venta)
+    except Exception as e:
+        print(f"[Sheets] update: {e}")
+        return False
+
+def sheets_delete(mes: str, row: int):
+    try:
+        from pos_sheets import delete_venta
+        return delete_venta(mes, row)
+    except Exception as e:
+        print(f"[Sheets] delete: {e}")
+        return False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# POS ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/pos/config")
+def get_pos_config():
+    return POS_CONFIG
+
+@app.patch("/pos/config")
+def update_pos_config(body: ConfigUpdate):
+    if body.vendedores          is not None: POS_CONFIG["vendedores"]          = body.vendedores
+    if body.propietarios        is not None: POS_CONFIG["propietarios"]        = body.propietarios
+    if body.marcas              is not None: POS_CONFIG["marcas"]              = body.marcas
+    if body.vendedores_externos is not None: POS_CONFIG["vendedores_externos"] = body.vendedores_externos
+    if body.com_externo_pct     is not None: POS_CONFIG["com_externo_pct"]     = body.com_externo_pct
+    return POS_CONFIG
+
+@app.get("/pos/products")
+async def pos_get_products():
+    query = """query($cursor:String){
+      products(first:250,after:$cursor,query:"status:active"){
+        pageInfo{hasNextPage endCursor}
+        edges{node{id title featuredImage{url}
+          variants(first:1){edges{node{id price inventoryQuantity inventoryItem{id}}}}
+        }}
+      }
+    }"""
+    all_p, cursor = [], None
+    while True:
+        data = await gql(query, {"cursor": cursor})
+        for e in data["products"]["edges"]:
+            n = e["node"]
+            v = n["variants"]["edges"][0]["node"] if n["variants"]["edges"] else None
+            if not v: continue
+            qty = v.get("inventoryQuantity", 0) or 0
+            all_p.append({
+                "id": n["id"], "title": n["title"],
+                "image": n["featuredImage"]["url"] if n["featuredImage"] else None,
+                "price": float(v["price"]), "stock": qty,
+                "variant_id": v["id"], "inventory_item_id": v["inventoryItem"]["id"],
+                "available": qty > 0,
+            })
+        pi = data["products"]["pageInfo"]
+        if not pi["hasNextPage"]: break
+        cursor = pi["endCursor"]
+    all_p.sort(key=lambda p: (0 if p["available"] else 1, p["title"]))
+    return {"products": all_p, "total": len(all_p)}
+
+@app.post("/pos/venta")
+async def pos_registrar_venta(venta: VentaIn):
+    from datetime import datetime
+    v = venta.dict()
+    if not v.get("timestamp"):
+        v["timestamp"] = datetime.now().isoformat()
+
+    order_name = None
+    if v.get("shopify_variant"):
+        try:
+            vd = await gql(
+                """query($id:ID!){productVariant(id:$id){inventoryItem{id}}}""",
+                {"id": v["shopify_variant"]}
+            )
+            inv_id = vd["productVariant"]["inventoryItem"]["id"]
+            await gql("""
+            mutation($input:InventoryAdjustQuantitiesInput!){
+              inventoryAdjustQuantities(input:$input){userErrors{field message}}
+            }""", {"input": {
+                "reason": "correction",
+                "name": f"POS {datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                "changes": [{"inventoryItemId": inv_id,
+                              "locationId": f"gid://shopify/Location/{LOCATION_ID}",
+                              "delta": -1}]
+            }})
+            dr = await gql("""
+            mutation($input:DraftOrderInput!){
+              draftOrderCreate(input:$input){draftOrder{name} userErrors{field message}}
+            }""", {"input": {
+                "lineItems": [{"variantId": v["shopify_variant"], "quantity": 1}],
+                "note": f"POS — {v.get('vendedor','')} — {v.get('tipo_pago','')}",
+                "tags": ["POS", v.get("tipo_pago", "")],
+            }})
+            if not dr["draftOrderCreate"]["userErrors"]:
+                order_name = dr["draftOrderCreate"]["draftOrder"]["name"]
+        except Exception as e:
+            print(f"[Shopify] {e}")
+
+    v["order_name"] = order_name
+    result = sheets_append(v)
+
+    return {
+        "success": True,
+        "order_name": order_name,
+        "sheet_url": result["sheet_url"] if result else None,
+        "mes": result["mes"] if result else MESES[__import__('datetime').datetime.now().month - 1],
+        "neto_tienda": v["neto_tienda"],
+    }
+
+@app.get("/pos/historial/{mes}")
+def pos_get_historial(mes: str):
+    if mes not in MESES:
+        raise HTTPException(400, "Mes inválido")
+    ventas = sheets_get(mes)
+    by_vend = {}
+    for v in ventas:
+        vend = v["vendedor"]
+        if vend not in by_vend:
+            by_vend[vend] = {"ventas": 0, "bruto": 0, "neto": 0, "comision": 0}
+        by_vend[vend]["ventas"]   += 1
+        by_vend[vend]["bruto"]    += v["precio_bruto"]
+        by_vend[vend]["neto"]     += v["neto_tienda"]
+        by_vend[vend]["comision"] += v["com_vendedor"]
+    return {
+        "mes": mes, "ventas": ventas,
+        "resumen": {
+            "total_ventas":       len(ventas),
+            "total_bruto":        round(sum(v["precio_bruto"] for v in ventas), 2),
+            "total_neto":         round(sum(v["neto_tienda"]  for v in ventas), 2),
+            "total_iva":          round(sum(v["iva"]          for v in ventas), 2),
+            "total_com_vendedor": round(sum(v["com_vendedor"] for v in ventas), 2),
+        },
+        "by_vendedor": by_vend,
+    }
+
+@app.put("/pos/venta")
+def pos_editar_venta(body: VentaUpdate):
+    if not sheets_update(body.mes, body.row_index, body.dict()):
+        raise HTTPException(500, "No se pudo actualizar")
+    return {"success": True}
+
+@app.delete("/pos/venta/{mes}/{row_index}")
+def pos_eliminar_venta(mes: str, row_index: int):
+    if mes not in MESES:
+        raise HTTPException(400, "Mes inválido")
+    if not sheets_delete(mes, row_index):
+        raise HTTPException(500, "No se pudo eliminar")
+    return {"success": True}
+
+@app.get("/pos/sheet-url")
+def pos_sheet_url():
+    try:
+        from pos_sheets import get_or_create_sheet
+        sid = get_or_create_sheet()
+        return {"url": f"https://docs.google.com/spreadsheets/d/{sid}"}
+    except Exception as e:
+        return {"url": None, "error": str(e)}
+
+# ── Servir el POS frontend ────────────────────────────────────────────────────
+app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")
+
+@app.get("/pos")
+@app.get("/pos/")
+async def serve_pos():
+    return FileResponse(str(BASE_DIR / "pos_static" / "index.html"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PANEL HTML (sin cambios)
+# ══════════════════════════════════════════════════════════════════════════════
 HTML = """<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -442,6 +719,21 @@ HTML = """<!DOCTYPE html>
     background: var(--white);
   }
 
+  .pos-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border: 1px solid var(--black);
+    color: var(--black);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .pos-link:hover { background: var(--black); color: var(--white); }
+
   .spinner {
     display: none;
     width: 8px;
@@ -546,12 +838,11 @@ HTML = """<!DOCTYPE html>
 
 <footer>
   <span>LÉ SANG © 2025</span>
-  <span id="footer-action">—</span>
+  <a href="/pos" class="pos-link" target="_blank">◻ ABRIR POS →</a>
   <span>ALFREDO BARROS ERRAZURIZ #1982</span>
 </footer>
 
 <script>
-  // ── RELOJ ──
   function updateClock() {
     const now = new Date();
     const pad = n => String(n).padStart(2,'0');
@@ -560,7 +851,6 @@ HTML = """<!DOCTYPE html>
   setInterval(updateClock, 1000);
   updateClock();
 
-  // ── LOG ──
   let prevLog = '';
 
   function addLog(msg, type = 'ok') {
@@ -581,13 +871,11 @@ HTML = """<!DOCTYPE html>
     prevLog = '';
   }
 
-  // Convierte líneas nuevas del log del servidor en entradas individuales
   function processNewLog(fullLog) {
     const newText = fullLog.slice(prevLog.length);
     prevLog = fullLog;
     const lines = newText.split('\\n').filter(l => l.trim());
     lines.forEach(line => {
-      // Filtrar líneas de separación (====)
       if (/^=+$/.test(line.trim())) return;
       const type = line.includes('✔') ? 'ok'
                  : line.includes('✘') ? 'error'
@@ -597,7 +885,6 @@ HTML = """<!DOCTYPE html>
     });
   }
 
-  // ── BADGE ──
   function setBadge(state) {
     const badge = document.getElementById('status-badge');
     badge.className = 'status-badge ' + state;
@@ -605,7 +892,6 @@ HTML = """<!DOCTYPE html>
     badge.textContent = labels[state] || state.toUpperCase();
   }
 
-  // ── PROGRESS ──
   function setProgress(pct, step) {
     document.getElementById('pct-display').textContent = Math.round(pct) + '%';
     const fill = document.getElementById('progress-fill');
@@ -615,7 +901,6 @@ HTML = """<!DOCTYPE html>
     if (step) document.getElementById('step-label').textContent = step.toUpperCase();
   }
 
-  // ── BOTONES ──
   function setAllDisabled(disabled) {
     ['btn-group','btn-ingest','btn-shopify','btn-activate'].forEach(id => {
       document.getElementById(id).disabled = disabled;
@@ -629,7 +914,6 @@ HTML = """<!DOCTYPE html>
     if (btnId) document.getElementById(btnId).classList.add('active');
   }
 
-  // ── POLLING ──
   let pollInterval = null;
 
   function startPolling() {
@@ -637,31 +921,22 @@ HTML = """<!DOCTYPE html>
       try {
         const res = await fetch('/status');
         const data = await res.json();
-
         setProgress(data.progress, data.step);
         setBadge(data.status);
-
         if (data.log) processNewLog(data.log);
-
         if (data.status === 'done' || data.status === 'error') {
           clearInterval(pollInterval);
           setAllDisabled(false);
           setActive(null);
           document.getElementById('spinner').classList.remove('visible');
           document.getElementById('footer-action').textContent = '—';
-          if (data.status === 'done') {
-            addLog('Proceso completado.', 'accent');
-          } else {
-            addLog('Error en el proceso. Revisá el log.', 'error');
-          }
+          if (data.status === 'done') addLog('Proceso completado.', 'accent');
+          else addLog('Error en el proceso. Revisá el log.', 'error');
         }
-      } catch (e) {
-        // silencioso — red temporalmente caída
-      }
+      } catch (e) {}
     }, 500);
   }
 
-  // ── RUN ──
   async function run(endpoint, btnId, label) {
     setAllDisabled(true);
     setActive(btnId);
@@ -669,44 +944,40 @@ HTML = """<!DOCTYPE html>
     setProgress(0, 'Iniciando...');
     prevLog = '';
     document.getElementById('spinner').classList.add('visible');
-    document.getElementById('footer-action').textContent = label;
     addLog('→ Iniciando: ' + label, 'accent');
 
     try {
       const res = await fetch(endpoint, { method: 'POST' });
       const data = await res.json();
-
       if (!data.ok) {
         setBadge('error');
         addLog('✘ ' + data.message, 'error');
         setAllDisabled(false);
         setActive(null);
         document.getElementById('spinner').classList.remove('visible');
-        document.getElementById('footer-action').textContent = '—';
         return;
       }
-
       startPolling();
-
     } catch (e) {
       setBadge('error');
       addLog('✘ Error de conexión: ' + e.message, 'error');
       setAllDisabled(false);
       setActive(null);
       document.getElementById('spinner').classList.remove('visible');
-      document.getElementById('footer-action').textContent = '—';
     }
   }
 </script>
-
 </body>
 </html>"""
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# PANEL ENDPOINTS (sin cambios)
+# ══════════════════════════════════════════════════════════════════════════════
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return HTML
-
 
 @app.get("/status")
 def status():
@@ -718,64 +989,49 @@ def status():
         "running": IS_RUNNING,
     })
 
-
 @app.post("/run-group")
 def run_group():
     ok, message = start_script("auto_group_to_drive.py")
     return JSONResponse({"ok": ok, "message": message})
-
 
 @app.post("/run-ingest")
 def run_ingest():
     ok, message = start_script("ingest.py")
     return JSONResponse({"ok": ok, "message": message})
 
-
 @app.post("/run-shopify")
 def run_shopify():
     ok, message = start_script("push_to_shopify.py")
     return JSONResponse({"ok": ok, "message": message})
 
+@app.post("/run-activate")
+def run_activate():
+    ok, message = start_script("publish_channels.py")
+    return JSONResponse({"ok": ok, "message": message})
 
 @app.get("/publications")
 def get_publications():
     domain = os.getenv("SHOPIFY_STORE_DOMAIN", "").strip().strip('"').strip("'")
     domain = domain.replace("https://", "").replace("http://", "").rstrip("/")
-    client_id = os.getenv("SHOPIFY_CLIENT_ID", "").strip().strip('"').strip("'")
+    client_id     = os.getenv("SHOPIFY_CLIENT_ID", "").strip().strip('"').strip("'")
     client_secret = os.getenv("SHOPIFY_CLIENT_SECRET", "").strip().strip('"').strip("'")
 
     token_res = requests.post(
         f"https://{domain}/admin/oauth/access_token",
-        data={
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret,
-        },
+        data={"grant_type": "client_credentials", "client_id": client_id, "client_secret": client_secret},
         timeout=30,
     )
-
     if token_res.status_code >= 400:
         return JSONResponse({"error": token_res.text}, status_code=400)
 
     token = token_res.json().get("access_token")
-
     if not token:
         return JSONResponse({"error": "No se pudo obtener token", "response": token_res.json()}, status_code=400)
 
     res = requests.post(
         f"https://{domain}/admin/api/2026-04/graphql.json",
-        headers={
-            "X-Shopify-Access-Token": token,
-            "Content-Type": "application/json",
-        },
+        headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
         json={"query": "{ publications(first: 10) { nodes { id name } } }"},
         timeout=30,
     )
-
     return res.json()
-
-
-@app.post("/run-activate")
-def run_activate():
-    ok, message = start_script("publish_channels.py")
-    return JSONResponse({"ok": ok, "message": message})
