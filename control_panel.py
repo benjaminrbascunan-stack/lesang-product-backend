@@ -246,6 +246,35 @@ def update_pos_config(body: ConfigUpdate):
     if body.com_externo_pct     is not None: POS_CONFIG["com_externo_pct"]     = body.com_externo_pct
     return POS_CONFIG
 
+@app.get("/pos/debug")
+async def pos_debug():
+    import httpx
+    domain = os.environ.get("SHOPIFY_STORE_DOMAIN", "NO CONFIGURADO")
+    token  = os.environ.get("SHOPIFY_CLIENT_SECRET", "NO CONFIGURADO")
+    # Enmascarar token para seguridad
+    token_masked = token[:6] + "..." + token[-4:] if len(token) > 10 else "CORTO/VACÍO"
+    
+    # Probar conexión real a Shopify
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(
+                f"https://{domain}/admin/api/2026-04/graphql.json",
+                headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
+                json={"query": "{ shop { name } }"}
+            )
+            return {
+                "domain": domain,
+                "token_masked": token_masked,
+                "shopify_status": r.status_code,
+                "shopify_response": r.json()
+            }
+    except Exception as e:
+        return {
+            "domain": domain,
+            "token_masked": token_masked,
+            "error": str(e)
+        }
+    
 @app.get("/pos/products")
 async def pos_get_products():
     query = """query($cursor:String){
