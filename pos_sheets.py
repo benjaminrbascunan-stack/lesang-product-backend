@@ -47,7 +47,18 @@ def get_or_create_sheet() -> str:
     """Devuelve el ID del spreadsheet POS, creándolo si no existe."""
     global _SHEET_ID
     if _SHEET_ID:
-        return _SHEET_ID
+        # Verificar que el sheet existente es válido
+        try:
+            creds  = get_creds()
+            sheets = build("sheets","v4",credentials=creds)
+            meta = sheets.spreadsheets().get(spreadsheetId=_SHEET_ID).execute()
+            # Si tiene hojas válidas, retornar
+            if meta.get("sheets"):
+                return _SHEET_ID
+        except Exception:
+            pass
+        # Si falló, resetear y recrear
+        _SHEET_ID = ""
 
     creds = get_creds()
     sheets = build("sheets","v4",credentials=creds)

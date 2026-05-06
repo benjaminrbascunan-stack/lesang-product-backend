@@ -331,16 +331,17 @@ async def pos_registrar_venta(venta: VentaIn):
             qtys        = level.get("quantities") or []
             current_qty = next((q["quantity"] for q in qtys if q["name"] == "available"), 0)
 
-            # 2. Descontar -1 pasando changeFromQuantity
-            m_adjust = """
-            mutation AdjustInv($input: InventoryAdjustQuantitiesInput!) {
-              inventoryAdjustQuantities(input: $input) {
-                userErrors { field message }
-                inventoryAdjustmentGroup {
-                  changes { quantityAfterChange }
-                }
-              }
-            }"""
+            # 2. Descontar -1 con idempotencyKey requerido por API 2026-04
+            ikey = f"pos-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+            m_adjust = (
+                "mutation AdjustInv($input: InventoryAdjustQuantitiesInput!)"
+                f" @idempotent(key: \"{ikey}\") {{"
+                "  inventoryAdjustQuantities(input: $input) {"
+                "    userErrors { field message }"
+                "    inventoryAdjustmentGroup { changes { quantityAfterChange } }"
+                "  }"
+                "}}"
+            )
             adj_result = await gql(m_adjust, {"input": {
                 "reason": "correction",
                 "name": f"POS {datetime.now().strftime('%Y%m%d-%H%M%S')}",
