@@ -128,18 +128,18 @@ SHOPIFY_GQL       = f"https://{SHOPIFY_DOMAIN}/admin/api/2026-04/graphql.json"
 SHOPIFY_TOKEN_URL = f"https://{SHOPIFY_DOMAIN}/admin/oauth/access_token"
 
 
-def get_shopify_token() -> str:
+async def get_shopify_token() -> str:
     """Genera un access token dinámico igual que push_to_shopify.py"""
-    r = requests.post(
-        SHOPIFY_TOKEN_URL,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        data={
-            "grant_type": "client_credentials",
-            "client_id": SHOPIFY_CLIENT_ID,
-            "client_secret": SHOPIFY_CLIENT_SECRET,
-        },
-        timeout=30,
-    )
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post(
+            SHOPIFY_TOKEN_URL,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={
+                "grant_type": "client_credentials",
+                "client_id": SHOPIFY_CLIENT_ID,
+                "client_secret": SHOPIFY_CLIENT_SECRET,
+            },
+        )
     if r.status_code >= 400:
         raise RuntimeError(f"Error obteniendo token Shopify: {r.status_code} {r.text[:500]}")
     token = r.json().get("access_token")
@@ -206,15 +206,15 @@ class ConfigUpdate(BaseModel):
 
 # ── Shopify helper ────────────────────────────────────────────────────────────
 async def gql(query: str, variables: dict = {}) -> dict:
-    token = get_shopify_token()
+    token = await get_shopify_token()
     headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
-    async with httpx.AsyncClient(timeout=20) as c:
+    async with httpx.AsyncClient(timeout=30) as c:
         r = await c.post(SHOPIFY_GQL, headers=headers,
                          json={"query": query, "variables": variables})
         r.raise_for_status()
         data = r.json()
         if "errors" in data:
-            raise HTTPException(500, detail=data["errors"])
+            raise HTTPException(500, detail=str(data["errors"]))
         return data["data"]
 
 
