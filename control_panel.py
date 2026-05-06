@@ -310,25 +310,60 @@ async def pos_registrar_venta(venta: VentaIn):
     order_name = None
     if v.get("shopify_variant"):
         try:
-            vd = await gql(
-                """query($id:ID!){productVariant(id:$id){inventoryItem{id}}}""",
-                {"id": v["shopify_variant"]}
-            )
-            inv_id = vd["productVariant"]["inventoryItem"]["id"]
-            await gql("""
-            mutation($input:InventoryAdjustQuantitiesInput!){
-              inventoryAdjustQuantities(input:$input){userErrors{field message}}
-            }""", {"input": {
+            loc_gid = f"gid://shopify/Location/{LOCATION_ID}"
+
+            # 1. Obtener inventoryItem id + stock actual (API 2026-04 requiere changeFromQuantity)
+            q_stock = """
+            query GetInvItem($vid: ID!, $loc: ID!) {
+              productVariant(id: $vid) {
+                inventoryItem {
+                  id
+                  inventoryLevel(locationId: $loc) {
+                    quantities(names: ["available"]) { name quantity }
+                  }
+                }
+              }
+            }"""
+            vd = await gql(q_stock, {"vid": v["shopify_variant"], "loc": loc_gid})
+            inv_item    = vd["productVariant"]["inventoryItem"]
+            inv_id      = inv_item["id"]
+            level       = inv_item.get("inventoryLevel") or {}
+            qtys        = level.get("quantities") or []
+            current_qty = next((q["quantity"] for q in qtys if q["name"] == "available"), 0)
+
+            # 2. Descontar -1 pasando changeFromQuantity
+            m_adjust = """
+            mutation AdjustInv($input: InventoryAdjustQuantitiesInput!) {
+              inventoryAdjustQuantities(input: $input) {
+                userErrors { field message }
+                inventoryAdjustmentGroup {
+                  changes { quantityAfterChange }
+                }
+              }
+            }"""
+            adj_result = await gql(m_adjust, {"input": {
                 "reason": "correction",
                 "name": f"POS {datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                "changes": [{"inventoryItemId": inv_id,
-                              "locationId": f"gid://shopify/Location/{LOCATION_ID}",
-                              "delta": -1}]
+                "changes": [{
+                    "inventoryItemId": inv_id,
+                    "locationId": loc_gid,
+                    "delta": -1,
+                    "changeFromQuantity": current_qty,
+                }]
             }})
-            dr = await gql("""
-            mutation($input:DraftOrderInput!){
-              draftOrderCreate(input:$input){draftOrder{name} userErrors{field message}}
-            }""", {"input": {
+            errs = adj_result["inventoryAdjustQuantities"]["userErrors"]
+            if errs:
+                print(f"[Shopify] inventory userErrors: {errs}")
+
+            # 3. Draft order para historial
+            m_draft = """
+            mutation CreateDraft($input: DraftOrderInput!) {
+              draftOrderCreate(input: $input) {
+                draftOrder { name }
+                userErrors { field message }
+              }
+            }"""
+            dr = await gql(m_draft, {"input": {
                 "lineItems": [{"variantId": v["shopify_variant"], "quantity": 1}],
                 "note": f"POS — {v.get('vendedor','')} — {v.get('tipo_pago','')}",
                 "tags": ["POS", v.get("tipo_pago", "")],
@@ -345,9 +380,10 @@ async def pos_registrar_venta(venta: VentaIn):
         "success": True,
         "order_name": order_name,
         "sheet_url": result["sheet_url"] if result else None,
-        "mes": result["mes"] if result else MESES[__import__('datetime').datetime.now().month - 1],
+        "mes": result["mes"] if result else MESES[datetime.now().month - 1],
         "neto_tienda": v["neto_tienda"],
     }
+
 
 @app.get("/pos/historial/{mes}")
 def pos_get_historial(mes: str):
