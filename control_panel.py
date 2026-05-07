@@ -205,9 +205,12 @@ class ConfigUpdate(BaseModel):
 
 
 # ── Shopify helper ────────────────────────────────────────────────────────────
-async def gql(query: str, variables: dict = {}) -> dict:
+async def gql(query: str, variables: dict = {}, idempotent: bool = False) -> dict:
+    from uuid import uuid4
     token = await get_shopify_token()
     headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
+    if idempotent:
+        headers["Shopify-Idempotency-Key"] = str(uuid4())
     async with httpx.AsyncClient(timeout=30) as c:
         r = await c.post(SHOPIFY_GQL, headers=headers,
                          json={"query": query, "variables": variables})
@@ -350,7 +353,7 @@ mutation SetInv($input: InventorySetOnHandQuantitiesInput!) {
                     "quantity": new_qty,
                     "changeFromQuantity": current_qty,
                 }]
-            }})
+            }}, idempotent=True)
             errs = set_result["inventorySetOnHandQuantities"]["userErrors"]
             if errs:
                 print(f"[Shopify] inventory userErrors: {errs}")

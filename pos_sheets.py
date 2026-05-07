@@ -466,21 +466,28 @@ def get_ventas_mes(mes: str) -> list:
         while len(row) < len(HEADERS):
             row.append("")
         try:
+            def to_float(val):
+                if not val: return 0.0
+                # Limpiar formato moneda: $120.000 -> 120000
+                clean = str(val).replace('$','').replace('.','').replace(',','.').strip()
+                try: return float(clean)
+                except: return 0.0
+
             ventas.append({
                 "row_index": i + 3,
                 "nombre_prenda":      row[0],
                 "talla":              row[1],
                 "propietario":        row[2],
                 "vendedor":           row[3],
-                "precio_bruto":       float(row[4] or 0),
+                "precio_bruto":       to_float(row[4]),
                 "tipo_pago":          row[5],
-                "iva":                float(row[6] or 0),
-                "pct_com_bancaria":   float(row[7] or 0),
-                "com_bancaria":       float(row[8] or 0),
-                "base_com_vendedor":  float(row[9] or 0),
-                "pct_com_vendedor":   float(row[10] or 0),
-                "com_vendedor":       float(row[11] or 0),
-                "neto_tienda":        float(row[12] or 0),
+                "iva":                to_float(row[6]),
+                "pct_com_bancaria":   to_float(row[7]),
+                "com_bancaria":       to_float(row[8]),
+                "base_com_vendedor":  to_float(row[9]),
+                "pct_com_vendedor":   to_float(row[10]),
+                "com_vendedor":       to_float(row[11]),
+                "neto_tienda":        to_float(row[12]),
                 "observaciones":      row[13],
                 "marca":              row[14],
                 "fecha":              row[15],
