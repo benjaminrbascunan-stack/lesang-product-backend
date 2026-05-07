@@ -982,6 +982,33 @@ def propose_folder_name_with_ai(
     return f"{prefix} {base}"
 
 
+def propose_folder_name_with_retry(
+    service, images: list[dict], index: int, needs_review: bool,
+    folder_index: int, total_folders: int,
+) -> str:
+    """Wrapper con retry automático para propose_folder_name_with_ai."""
+    max_retries = 4
+    for attempt in range(max_retries):
+        try:
+            return propose_folder_name_with_ai(
+                service=service,
+                images=images,
+                index=index,
+                needs_review=needs_review,
+                folder_index=folder_index,
+                total_folders=total_folders,
+            )
+        except Exception as e:
+            if "429" in str(e) or "rate_limit" in str(e).lower():
+                wait = 20 * (attempt + 1)
+                print(f"  ⚠ Rate limit en nombre carpeta — esperando {wait}s...")
+                time.sleep(wait)
+                if attempt == max_retries - 1:
+                    raise
+            else:
+                raise
+
+
 # =========================
 # CREATE FOLDERS IN DRIVE
 # =========================
@@ -1003,7 +1030,7 @@ def create_folders_from_groups(service, groups: list[dict]):
         needs_review = bool(group.get("needs_review"))
         auto_split   = bool(group.get("auto_split"))
 
-        folder_name = propose_folder_name_with_ai(
+        folder_name = propose_folder_name_with_retry(
             service=service,
             images=images,
             index=product_index if not needs_review else review_index,
