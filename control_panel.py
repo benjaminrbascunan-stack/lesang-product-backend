@@ -316,50 +316,37 @@ async def pos_registrar_venta(venta: VentaIn):
         try:
             loc_gid = f"gid://shopify/Location/{LOCATION_ID}"
 
-            # 1. Obtener inventoryItem id + stock actual
-            loc_gid = f"gid://shopify/Location/{LOCATION_ID}"
-            q_stock = """
-query GetInvItem($vid: ID!, $loc: ID!) {
+            # 1. Obtener inventory_item_id numérico via GraphQL
+            q_item = """
+query GetVariant($vid: ID!) {
   productVariant(id: $vid) {
-    inventoryItem {
-      id
-      inventoryLevel(locationId: $loc) {
-        quantities(names: ["available"]) { name quantity }
-      }
-    }
+    inventoryItem { id }
   }
 }"""
-            vd = await gql(q_stock, {"vid": v["shopify_variant"], "loc": loc_gid})
-            inv_item    = vd["productVariant"]["inventoryItem"]
-            inv_id      = inv_item["id"]
-            level       = inv_item.get("inventoryLevel") or {}
-            qtys        = level.get("quantities") or []
-            current_qty = next((q["quantity"] for q in qtys if q["name"] == "available"), 0)
-            new_qty     = max(0, current_qty - 1)
+            vd = await gql(q_item, {"vid": v["shopify_variant"]})
+            inv_gid = vd["productVariant"]["inventoryItem"]["id"]
+            # GID format: gid://shopify/InventoryItem/12345 -> extraer número
+            inv_item_id = inv_gid.split("/")[-1]
 
-            # 2. Setear stock con changeFromQuantity (requerido por API 2026-04)
-            m_set = """
-mutation SetInv($input: InventorySetOnHandQuantitiesInput!) {
-  inventorySetOnHandQuantities(input: $input) {
-    userErrors { field message }
-    inventoryAdjustmentGroup { changes { quantityAfterChange } }
-  }
-}"""
-            set_result = await gql(m_set, {"input": {
-                "reason": "correction",
-                "setQuantities": [{
-                    "inventoryItemId": inv_id,
-                    "locationId": loc_gid,
-                    "quantity": new_qty,
-                    "changeFromQuantity": current_qty,
-                }]
-            }}, idempotent=True)
-            errs = set_result["inventorySetOnHandQuantities"]["userErrors"]
-            if errs:
-                print(f"[Shopify] inventory userErrors: {errs}")
+            # 2. Usar REST API para ajustar inventario — no requiere @idempotent
+            token = await get_shopify_token()
+            rest_url = f"https://{SHOPIFY_DOMAIN}/admin/api/2026-04/inventory_levels/adjust.json"
+            async with httpx.AsyncClient(timeout=30) as c:
+                rest_r = await c.post(
+                    rest_url,
+                    headers={"X-Shopify-Access-Token": token, "Content-Type": "application/json"},
+                    json={
+                        "location_id": int(LOCATION_ID),
+                        "inventory_item_id": int(inv_item_id),
+                        "available_adjustment": -1,
+                    }
+                )
+            if rest_r.status_code >= 400:
+                print(f"[Shopify] REST inventory error {rest_r.status_code}: {rest_r.text[:300]}")
             else:
-                after = set_result["inventorySetOnHandQuantities"]["inventoryAdjustmentGroup"]["changes"][0]["quantityAfterChange"]
-                print(f"[Shopify] stock OK: {current_qty} -> {after}")
+                data = rest_r.json()
+                after = data.get("inventory_level", {}).get("available", "?")
+                print(f"[Shopify] stock OK -> disponible ahora: {after}")
 
             # 3. Draft order para historial
             m_draft = """
