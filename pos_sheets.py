@@ -193,7 +193,7 @@ def _format_mes_requests(sheet_gid: int, mes: str) -> list:
          {"userEnteredValue": {"stringValue": ""}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total ventas"),
-         {"userEnteredValue": {"formulaValue": "=COUNTA(A3:A)"},
+         {"userEnteredValue": {"formulaValue": "=COUNTA(E3:E)"},
           "userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 12, "foregroundColor": COLOR_ACCENT}, "horizontalAlignment": "RIGHT"}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total bruto"),
@@ -375,8 +375,8 @@ def _data_row(venta: dict) -> list:
         float(round(venta.get("neto_tienda", 0), 2)),
         venta.get("observaciones", ""),
         venta.get("marca", ""),
-        "'" + fecha,   # prefijo ' fuerza texto plano en Sheets
-        "'" + hora,    # prefijo ' fuerza texto plano en Sheets
+        fecha,
+        hora,
         venta.get("order_name", "") or "",
         float(vc) if vc != "" else "",
         float(margen) if margen != "" else "",
@@ -399,8 +399,8 @@ def append_venta(venta: dict) -> dict:
     # Append desde fila 3 (después de título + cabeceras)
     result = sheets.spreadsheets().values().append(
         spreadsheetId=sid,
-        range=f"{mes_nombre}!A3:R",
-        valueInputOption="USER_ENTERED",
+        range=f"{mes_nombre}!A3:T",
+        valueInputOption="RAW",
         insertDataOption="INSERT_ROWS",
         body={"values": [row]},
     ).execute()
@@ -465,7 +465,7 @@ def get_ventas_mes(mes: str) -> list:
 
     result = sheets.spreadsheets().values().get(
         spreadsheetId=sid,
-        range=f"{mes}!A3:R",
+        range=f"{mes}!A3:T",
     ).execute()
 
     rows   = result.get("values", [])
@@ -519,8 +519,8 @@ def update_venta(mes: str, row_index: int, venta: dict) -> bool:
     row    = _data_row(venta)
     sheets.spreadsheets().values().update(
         spreadsheetId=sid,
-        range=f"{mes}!A{row_index}:R{row_index}",
-        valueInputOption="USER_ENTERED",
+        range=f"{mes}!A{row_index}:T{row_index}",
+        valueInputOption="RAW",
         body={"values": [row]},
     ).execute()
     return True
