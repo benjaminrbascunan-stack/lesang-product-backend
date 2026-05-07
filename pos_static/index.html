@@ -982,7 +982,10 @@ function deselect(){
   recalc(); renderGrid();
 }
 
-function calcular(precio,pago,vendedor){
+// Marcas que NO generan comisión para vendedoras externas
+const MARCAS_SIN_COMISION_VEND = ['Pop disaster','Pedritos','Season Archive','Nube','Gelattos'];
+
+function calcular(precio,pago,vendedor,marca){
   precio=parseFloat(precio)||0;
   if(!precio) return null;
   const iva_tipos=CFG.iva_tipos||['Débito','Crédito'];
@@ -990,7 +993,10 @@ function calcular(precio,pago,vendedor){
   const pctB=(CFG.com_bancaria||{})[pago]||0;
   const comB=precio*pctB;
   const esExt=(CFG.vendedores_externos||[]).includes(vendedor);
-  const pctV=esExt?(CFG.com_externo_pct||0.05):0;
+  // Comisión solo aplica en Tienda y Consignación, NO en marcas externas
+  const marcaActual=marca||document.getElementById('f-marca')?.value||'Tienda';
+  const marcaSinCom=MARCAS_SIN_COMISION_VEND.includes(marcaActual);
+  const pctV=(esExt&&!marcaSinCom)?(CFG.com_externo_pct||0.05):0;
   const comV=precio*pctV;
   return{precio,iva,pctB,comB,pctV,comV,neto:precio-iva-comB-comV};
 }
@@ -999,7 +1005,8 @@ function recalc(){
   const precio=document.getElementById('f-precio').value;
   const pago=document.getElementById('f-pago').value;
   const vend=document.getElementById('f-vend').value;
-  const c=calcular(precio,pago,vend);
+  const marca=document.getElementById('f-marca').value;
+  const c=calcular(precio,pago,vend,marca);
   if(!c){
     ['c-bruto','c-iva','c-banco','c-cvend','c-neto'].forEach(id=>document.getElementById(id).textContent='—');
     document.getElementById('sell-btn').disabled=true;
@@ -1029,7 +1036,7 @@ async function registrarVenta(){
   if(!precio){toast('Ingresa el precio','err');return;}
   if(!vend){toast('Selecciona el vendedor','err');return;}
 
-  const c=calcular(precio,pago,vend);
+  const c=calcular(precio,pago,vend,marca);
   if(!c) return;
 
   const btn=document.getElementById('sell-btn');
@@ -1224,7 +1231,8 @@ async function guardarEdicion(){
   const precio=parseFloat(document.getElementById('e-precio').value)||0;
   const pago=document.getElementById('e-pago').value;
   const vend=document.getElementById('e-vend').value;
-  const c=calcular(precio,pago,vend);
+  const marca3=document.getElementById('e-marca').value;
+  const c=calcular(precio,pago,vend,marca3);
   if(!c){toast('Precio inválido','err');return;}
   const payload={
     ...editingVenta,
@@ -1444,8 +1452,8 @@ function renderResumenes(d,mes){
     if(!marcas[m]) marcas[m]={ventas:0,bruto:0,comision_tienda:0,neto_marca:0};
     marcas[m].ventas++;
     marcas[m].bruto+=x.precio_bruto;
-    // Comisión tienda sobre marcas externas (25% hardcoded, idealmente desde CFG)
-    const esExt=!['Tienda',''].includes(m);
+    // Comisión tienda sobre marcas externas (desde com_vendedor ya calculado)
+    const esExt=!['Tienda','Consignacion',''].includes(m);
     const com=esExt?x.precio_bruto*0.25:x.neto_tienda;
     marcas[m].comision_tienda+=com;
   });
@@ -1463,18 +1471,27 @@ function renderResumenes(d,mes){
       </div>`).join('')}
   </div>`;
 
-  // Comisiones vendedores
+  // Comisiones vendedoras - recalcular solo sobre ventas Tienda/Consignacion
   const extVend=CFG.vendedores_externos||[];
-  const vendCom=Object.entries(bv).filter(([n])=>extVend.includes(n));
+  const vendComReal={};
+  v.forEach(x=>{
+    if(!extVend.includes(x.vendedor)) return;
+    if(MARCAS_SIN_COMISION_VEND.includes(x.marca||'')) return;
+    if(!vendComReal[x.vendedor]) vendComReal[x.vendedor]={ventas:0,bruto:0,comision:0};
+    vendComReal[x.vendedor].ventas++;
+    vendComReal[x.vendedor].bruto+=x.precio_bruto;
+    vendComReal[x.vendedor].comision+=x.com_vendedor;
+  });
+  const vendCom=Object.entries(vendComReal);
   const vendCard=`<div class="res-card">
     <div class="res-card-title">Comisiones vendedoras</div>
     ${vendCom.length?vendCom.sort((a,b)=>b[1].comision-a[1].comision).map(([name,dd])=>`
       <div class="res-vend-row">
         <div>
           <div class="res-vend-name">${esc(name)}</div>
-          <div style="font-size:9px;color:var(--gray4)">${dd.ventas} ventas · \$${fmt(dd.bruto)} bruto</div>
+          <div style="font-size:9px;color:var(--gray4)">${dd.ventas} ventas tienda · $${fmt(dd.bruto)} bruto</div>
         </div>
-        <div class="res-vend-com">\$${fmt(Math.round(dd.comision))}</div>
+        <div class="res-vend-com">$${fmt(Math.round(dd.comision))}</div>
       </div>`).join('')
     :`<div class="res-empty">Sin comisiones este mes</div>`}
   </div>`;

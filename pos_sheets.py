@@ -193,19 +193,24 @@ def _format_mes_requests(sheet_gid: int, mes: str) -> list:
          {"userEnteredValue": {"stringValue": ""}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total ventas"),
-         _resumen_value_cell("=COUNTA(A3:A)", False),
+         {"userEnteredValue": {"formulaValue": "=COUNTA(A3:A)"},
+          "userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 12, "foregroundColor": COLOR_ACCENT}, "horizontalAlignment": "RIGHT"}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total bruto"),
-         _resumen_value_cell("=SUM(E3:E)"),
+         {"userEnteredValue": {"formulaValue": "=SUM(E3:E)"},
+          "userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 10, "foregroundColor": COLOR_ACCENT}, "horizontalAlignment": "RIGHT", "numberFormat": {"type": "CURRENCY", "pattern": '"$"#,##0'}}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total IVA"),
-         _resumen_value_cell("=SUM(G3:G)"),
+         {"userEnteredValue": {"formulaValue": "=SUM(G3:G)"},
+          "userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 10, "foregroundColor": COLOR_ACCENT}, "horizontalAlignment": "RIGHT", "numberFormat": {"type": "CURRENCY", "pattern": '"$"#,##0'}}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total com. bancaria"),
-         _resumen_value_cell("=SUM(I3:I)"),
+         {"userEnteredValue": {"formulaValue": "=SUM(I3:I)"},
+          "userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 10, "foregroundColor": COLOR_ACCENT}, "horizontalAlignment": "RIGHT", "numberFormat": {"type": "CURRENCY", "pattern": '"$"#,##0'}}},
          {"userEnteredValue": {"stringValue": ""}}],
         [_resumen_label_cell("Total com. vendedores"),
-         _resumen_value_cell("=SUM(L3:L)"),
+         {"userEnteredValue": {"formulaValue": "=SUM(L3:L)"},
+          "userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 10, "foregroundColor": COLOR_ACCENT}, "horizontalAlignment": "RIGHT", "numberFormat": {"type": "CURRENCY", "pattern": '"$"#,##0'}}},
          {"userEnteredValue": {"stringValue": ""}}],
         [{"userEnteredValue": {"stringValue": ""}},
          {"userEnteredValue": {"stringValue": ""}},
@@ -216,7 +221,7 @@ def _format_mes_requests(sheet_gid: int, mes: str) -> list:
               "textFormat": {"bold": True, "fontSize": 11, "foregroundColor": COLOR_ACCENT_TEXT},
               "horizontalAlignment": "LEFT"
           }},
-         {"userEnteredValue": {"formulaValue": "=SUM(M3:M)"},
+         {"userEnteredValue": {"formulaValue": "=SUM(E3:E)-SUM(G3:G)-SUM(I3:I)-SUM(L3:L)"},
           "userEnteredFormat": {
               "backgroundColor": COLOR_ACCENT,
               "textFormat": {"bold": True, "fontSize": 14, "foregroundColor": COLOR_ACCENT_TEXT},
@@ -359,9 +364,9 @@ def _data_row(venta: dict) -> list:
         venta.get("talla", "—"),
         venta.get("propietario", ""),
         venta.get("vendedor", ""),
-        float(venta.get("precio_bruto", 0)),       # número puro
+        float(venta.get("precio_bruto", 0)),
         venta.get("tipo_pago", ""),
-        float(round(venta.get("iva", 0), 2)),       # número puro
+        float(round(venta.get("iva", 0), 2)),
         float(venta.get("pct_com_bancaria", 0)),
         float(round(venta.get("com_bancaria", 0), 2)),
         float(venta.get("base_com_vendedor", 0)),
@@ -370,11 +375,11 @@ def _data_row(venta: dict) -> list:
         float(round(venta.get("neto_tienda", 0), 2)),
         venta.get("observaciones", ""),
         venta.get("marca", ""),
-        fecha,
-        hora,
+        "'" + fecha,   # prefijo ' fuerza texto plano en Sheets
+        "'" + hora,    # prefijo ' fuerza texto plano en Sheets
         venta.get("order_name", "") or "",
-        float(vc) if vc != "" else "",              # valor compra (opcional)
-        float(margen) if margen != "" else "",      # margen (opcional)
+        float(vc) if vc != "" else "",
+        float(margen) if margen != "" else "",
     ]
 
 
