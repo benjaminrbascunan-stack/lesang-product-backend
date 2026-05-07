@@ -30,7 +30,7 @@ HEADERS = [
 ]
 
 # Columnas de resumen (lado derecho, col R en adelante)
-RESUMEN_COL = 19  # columna T (0-indexed)
+RESUMEN_COL = 22  # columna W (0-indexed) — lejos de los datos A-T
 
 # Colores marca Lé Sang
 COLOR_BG_HEADER = {"red": 0.0, "green": 0.0, "blue": 0.0}        # negro
@@ -41,7 +41,7 @@ COLOR_ROW_ALT = {"red": 0.98, "green": 0.98, "blue": 0.98}        # gris muy cla
 COLOR_TOTAL_BG = {"red": 0.0, "green": 0.0, "blue": 0.0}          # negro
 COLOR_TOTAL_TEXT = {"red": 1.0, "green": 1.0, "blue": 1.0}        # blanco
 
-_SHEET_ID = os.environ.get("POS_SHEET_ID", "")
+_SHEET_ID = ""  # siempre buscar en Drive al iniciar, no confiar en variable de entorno
 
 
 def get_creds() -> Credentials:
@@ -278,37 +278,38 @@ def get_or_create_sheet() -> str:
     sheets = build("sheets", "v4", credentials=creds)
     drive  = build("drive",  "v3", credentials=creds)
 
-    # Verificar si el sheet existente es válido
+    # Si ya tenemos ID en memoria de este proceso, verificarlo rápido
     if _SHEET_ID:
         try:
             meta = sheets.spreadsheets().get(spreadsheetId=_SHEET_ID).execute()
-            existing_sheets = meta.get("sheets", [])
-            # Verificar que tenga las hojas de los meses
-            existing_titles = [s["properties"]["title"] for s in existing_sheets]
-            if all(m in existing_titles for m in MESES):
+            titles = [s["properties"]["title"] for s in meta.get("sheets", [])]
+            if all(m in titles for m in MESES):
                 return _SHEET_ID
-        except Exception as e:
-            print(f"[Sheets] Sheet existente inválido ({e}), recreando...")
-        _SHEET_ID = ""
+        except Exception:
+            _SHEET_ID = ""
 
-    # Buscar si ya existe uno válido en Drive
+    # Siempre buscar en Drive por nombre (sobrevive reinicios de Railway)
     q = "name='Lé Sang — Ventas POS' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
-    results = drive.files().list(q=q, fields="files(id,name)").execute()
+    results = drive.files().list(q=q, fields="files(id,name)", orderBy="createdTime desc").execute()
     files = results.get("files", [])
-    if files:
-        candidate = files[0]["id"]
+
+    for f in files:
+        candidate = f["id"]
         try:
             meta = sheets.spreadsheets().get(spreadsheetId=candidate).execute()
             titles = [s["properties"]["title"] for s in meta.get("sheets", [])]
             if all(m in titles for m in MESES):
                 _SHEET_ID = candidate
+                print(f"[Sheets] Sheet encontrado en Drive: {candidate}")
                 return _SHEET_ID
         except Exception:
-            pass
-        # Borrar el corrupto
+            continue
+
+    # Borrar sheets corruptos si los hay
+    for f in files:
         try:
-            drive.files().delete(fileId=candidate).execute()
-            print("[Sheets] Sheet corrupto eliminado, recreando...")
+            drive.files().delete(fileId=f["id"]).execute()
+            print(f"[Sheets] Sheet corrupto eliminado: {f['id']}")
         except Exception:
             pass
 
