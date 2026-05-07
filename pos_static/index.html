@@ -1,6 +1,3 @@
-Index · HTML
-Copiar
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -27,7 +24,7 @@ Copiar
   --transition:all .15s ease;
 }
 html,body{height:100%;background:var(--white);color:var(--text);font-family:var(--font);overflow:hidden;font-size:12px}
- 
+
 /* ── LOADING SCREEN ── */
 #loading{
   position:fixed;inset:0;background:var(--black);
@@ -49,7 +46,7 @@ html,body{height:100%;background:var(--white);color:var(--text);font-family:var(
 .load-bar-track{width:120px;height:1px;background:#333}
 .load-bar{height:1px;background:var(--white);width:0;transition:width .4s ease}
 .load-status{font-size:9px;letter-spacing:.2em;color:#555;margin-top:12px;text-transform:uppercase}
- 
+
 /* ── NAV ── */
 nav{
   position:fixed;top:0;left:0;right:0;height:var(--nav);
@@ -89,17 +86,17 @@ nav{
   transition:var(--transition);text-transform:uppercase;
 }
 #sheet-link:hover{color:var(--white);border-color:#555}
- 
+
 /* ── PAGES ── */
 .page{position:fixed;top:var(--nav);left:0;right:0;bottom:0;display:none;overflow:hidden;background:var(--white)}
 .page.active{display:flex}
- 
+
 /* ══════════════════════
    POS PAGE
 ══════════════════════ */
 #page-pos{flex-direction:row}
 .pos-left{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--gray2)}
- 
+
 /* Toolbar */
 .pos-toolbar{
   height:40px;display:flex;align-items:center;
@@ -123,13 +120,13 @@ nav{
 .pfbtn:hover{color:var(--text)}
 .pfbtn.active{color:var(--orange);border-bottom:1px solid var(--orange)}
 .pos-count{padding:0 14px;font-size:9px;color:var(--gray4);white-space:nowrap;letter-spacing:.1em}
- 
+
 /* Grid */
 .grid-wrap{flex:1;overflow-y:auto;padding:16px;background:var(--gray1)}
 .grid-wrap::-webkit-scrollbar{width:3px}
 .grid-wrap::-webkit-scrollbar-thumb{background:var(--gray3)}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--gray2)}
- 
+
 .pcard{
   background:var(--white);cursor:pointer;position:relative;overflow:hidden;
   transition:var(--transition);
@@ -162,7 +159,7 @@ nav{
 .pctitle{font-size:10px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;letter-spacing:.02em;font-weight:400}
 .pcprice{font-size:13px;font-weight:600;color:var(--text);letter-spacing:.02em}
 .pcprice small{font-size:9px;font-weight:400;color:var(--gray4);margin-left:2px;letter-spacing:.1em}
- 
+
 /* ── CART PANEL ── */
 .cart-panel{
   width:var(--cart);display:flex;flex-direction:column;overflow:hidden;
@@ -175,7 +172,7 @@ nav{
 }
 .cp-title{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
 .cp-sub{font-size:9px;color:var(--gray4);letter-spacing:.1em}
- 
+
 /* Selected strip */
 .sel-strip{
   padding:10px 14px;border-bottom:1px solid var(--gray2);
@@ -191,7 +188,7 @@ nav{
 .sel-rm{background:none;border:none;cursor:pointer;padding:4px;color:var(--gray4);transition:var(--transition)}
 .sel-rm:hover{color:var(--text)}
 .sel-rm svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.5}
- 
+
 /* Form */
 .cp-form{padding:12px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex-shrink:0}
 .cp-form::-webkit-scrollbar{width:2px}
@@ -216,7 +213,7 @@ nav{
 .price-wrap{position:relative}
 .price-wrap .finput{padding-left:22px}
 .price-pre{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--gray4);font-size:11px;pointer-events:none}
- 
+
 /* Calc */
 .calc-block{
   margin:0 14px;background:var(--gray1);
@@ -230,7 +227,7 @@ nav{
 .cdiv{height:1px;background:var(--gray2);margin:6px 0}
 .ctlabel{font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
 .ctval{font-size:18px;font-weight:600;color:var(--text)}
- 
+
 /* Footer */
 .cp-footer{padding:12px 14px;border-top:1px solid var(--gray2);flex-shrink:0;background:var(--white);display:flex;flex-direction:column;gap:6px}
 .sell-btn{
@@ -247,7 +244,7 @@ nav{
   letter-spacing:.2em;text-transform:uppercase;transition:var(--transition);
 }
 .clear-btn:hover{border-color:var(--text);color:var(--text)}
- 
+
 /* ══════════════════════
    HISTORIAL PAGE
 ══════════════════════ */
@@ -265,12 +262,12 @@ nav{
 }
 .mes-btn:hover{color:var(--text)}
 .mes-btn.active{color:var(--text);border-bottom:1px solid var(--orange)}
- 
+
 .hist-body{flex:1;display:flex;overflow:hidden}
 .hist-left{flex:1;overflow:auto}
 .hist-left::-webkit-scrollbar{width:3px;height:3px}
 .hist-left::-webkit-scrollbar-thumb{background:var(--gray2)}
- 
+
 .hist-table{width:100%;border-collapse:collapse;font-size:10px}
 .hist-table th{
   padding:8px 12px;text-align:left;background:var(--gray1);
@@ -300,7 +297,7 @@ nav{
 }
 .tdbtn:hover{border-color:var(--text);color:var(--text)}
 .tdbtn.del:hover{border-color:#cc3300;color:#cc3300}
- 
+
 /* Resumen sidebar */
 .hist-right{width:260px;overflow-y:auto;background:var(--white);border-left:1px solid var(--gray2)}
 .hist-right::-webkit-scrollbar{width:2px}
@@ -325,7 +322,111 @@ nav{
 .expbtn:hover{background:var(--orange)}
 .expbtn.sec{background:var(--white);color:var(--text);border:1px solid var(--gray2)}
 .expbtn.sec:hover{border-color:var(--text)}
- 
+
+/* ══════════════════════
+   RESUMENES PAGE
+══════════════════════ */
+#page-resumenes{flex-direction:column;overflow-y:auto;background:var(--gray1)}
+.res-header{
+  background:var(--white);border-bottom:1px solid var(--gray2);
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.res-header-title{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.res-mes-select{
+  background:var(--white);border:1px solid var(--gray2);
+  color:var(--text);font-family:var(--font);font-size:10px;
+  padding:5px 10px;outline:none;cursor:pointer;letter-spacing:.05em;
+  appearance:none;padding-right:24px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 8px center;
+}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1px;background:var(--gray2);padding:1px;flex:1}
+.res-card{background:var(--white);padding:20px}
+.res-card-title{font-size:8px;font-weight:600;letter-spacing:.25em;text-transform:uppercase;color:var(--gray4);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.res-card-title::after{content:'';flex:1;height:1px;background:var(--gray2)}
+.res-stat{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--gray2)}
+.res-stat:last-child{border-bottom:none}
+.res-stat-label{font-size:10px;color:var(--gray5)}
+.res-stat-val{font-size:13px;font-weight:600;color:var(--text)}
+.res-stat-val.orange{color:var(--orange)}
+.res-stat-val.green{color:#1a7a3a}
+.res-stat-val.red{color:#cc3300}
+.res-big{font-size:28px;font-weight:700;color:var(--text);margin:10px 0 4px}
+.res-sub{font-size:9px;color:var(--gray4);letter-spacing:.1em}
+.res-marca-row{padding:8px 0;border-bottom:1px solid var(--gray2)}
+.res-marca-row:last-child{border-bottom:none}
+.res-marca-name{font-size:11px;font-weight:600;margin-bottom:4px}
+.res-marca-stats{display:flex;gap:16px}
+.res-marca-stat{font-size:9px;color:var(--gray4)}
+.res-marca-stat strong{display:block;font-size:11px;color:var(--text);font-weight:600}
+.res-marca-stat.oran strong{color:var(--orange)}
+.res-vend-row{padding:8px 0;border-bottom:1px solid var(--gray2);display:flex;align-items:center;justify-content:space-between}
+.res-vend-row:last-child{border-bottom:none}
+.res-vend-name{font-size:11px;font-weight:600}
+.res-vend-com{font-size:13px;font-weight:700;color:var(--orange)}
+.res-empty{padding:20px 0;font-size:9px;color:var(--gray4);letter-spacing:.1em;text-align:center}
+.res-card.full{grid-column:1/-1}
+
+/* ══════════════════════
+   OPERACIONES PAGE
+══════════════════════ */
+#page-ops{flex-direction:column;overflow:hidden;background:var(--white)}
+.ops-body{flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+.ops-left{border-right:1px solid var(--gray2);display:flex;flex-direction:column;overflow:hidden}
+.ops-actions{flex:1;display:flex;flex-direction:column}
+.ops-btn{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;border:none;border-bottom:1px solid var(--gray2);
+  background:transparent;cursor:pointer;text-align:left;
+  transition:background .15s;font-family:var(--font);flex:1;
+}
+.ops-btn:hover:not(:disabled){background:var(--black)}
+.ops-btn:hover:not(:disabled) .ops-label{color:var(--white)}
+.ops-btn:hover:not(:disabled) .ops-sub{color:#555}
+.ops-btn:hover:not(:disabled) .ops-arrow{color:var(--white)}
+.ops-btn.active{background:var(--black)}
+.ops-btn.active .ops-label{color:var(--white)}
+.ops-btn.active .ops-sub{color:var(--orange)}
+.ops-btn:disabled{opacity:.3;cursor:not-allowed}
+.ops-num{font-size:9px;color:var(--gray4);letter-spacing:.2em;margin-bottom:4px}
+.ops-label{font-size:22px;font-weight:600;letter-spacing:.05em;color:var(--text);transition:color .15s}
+.ops-sub{font-size:9px;color:var(--gray4);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;transition:color .15s}
+.ops-arrow{font-size:16px;color:var(--gray3);transition:color .15s}
+.ops-right{display:flex;flex-direction:column;overflow:hidden;background:var(--gray1)}
+.ops-status-bar{
+  height:40px;padding:0 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--gray2);background:var(--white);flex-shrink:0;
+}
+.ops-status-label{font-size:9px;color:var(--gray4);letter-spacing:.15em;text-transform:uppercase}
+.ops-badge{font-size:9px;padding:3px 8px;letter-spacing:.1em;text-transform:uppercase}
+.ops-badge.idle{background:var(--gray2);color:var(--gray4)}
+.ops-badge.running{background:var(--black);color:var(--white)}
+.ops-badge.done{background:var(--orange);color:var(--white)}
+.ops-badge.error{background:#cc3300;color:var(--white)}
+.ops-progress{padding:16px 20px;border-bottom:1px solid var(--gray2);background:var(--white);flex-shrink:0}
+.ops-pct{font-size:40px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.ops-bar-track{height:1px;background:var(--gray2);margin:8px 0 6px}
+.ops-bar-fill{height:1px;background:var(--text);transition:width .4s ease;width:0}
+.ops-bar-fill.done{background:var(--orange)}
+.ops-step{font-size:9px;color:var(--gray4);letter-spacing:.1em;text-transform:uppercase}
+.ops-log{flex:1;overflow-y:auto;padding:12px 20px;display:flex;flex-direction:column;gap:4px}
+.ops-log::-webkit-scrollbar{width:2px}
+.ops-log::-webkit-scrollbar-thumb{background:var(--gray2)}
+.ops-log-entry{display:grid;grid-template-columns:56px 1fr;gap:10px;font-size:10px}
+.ops-log-time{color:var(--gray3);letter-spacing:.05em}
+.ops-log-msg{color:var(--text);line-height:1.5;word-break:break-word}
+.ops-log-msg.info{color:var(--gray4)}
+.ops-log-msg.accent{color:var(--orange)}
+.ops-log-msg.error{color:#cc3300}
+.ops-spinner{
+  display:none;width:7px;height:7px;border:1px solid var(--gray2);
+  border-top-color:var(--text);border-radius:50%;
+  animation:spin .7s linear infinite;margin-left:6px;vertical-align:middle;
+}
+.ops-spinner.on{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 /* ══════════════════════
    CONFIG PAGE
 ══════════════════════ */
@@ -376,7 +477,7 @@ nav{
   font-size:9px;color:var(--gray5);padding:8px 10px;
   background:var(--gray1);border-left:2px solid var(--orange);letter-spacing:.05em;line-height:1.5;
 }
- 
+
 /* ══════════════════════
    MODAL
 ══════════════════════ */
@@ -417,12 +518,12 @@ nav{
   letter-spacing:.2em;text-transform:uppercase;cursor:pointer;transition:var(--transition);
 }
 .m-btn:hover{background:var(--orange)}
- 
+
 /* Edit modal */
 .edit-form{display:flex;flex-direction:column;gap:8px;padding:20px 24px}
 .edit-row{display:flex;gap:8px}
 .edit-grp{display:flex;flex-direction:column;gap:3px;flex:1}
- 
+
 /* Toast */
 .toast{
   position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);
@@ -434,7 +535,7 @@ nav{
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.err{background:#cc3300}
 .toast.ok{background:var(--orange)}
- 
+
 /* Empty */
 .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;color:var(--gray3);gap:10px;width:100%}
 .empty-state svg{width:32px;height:32px;stroke:var(--gray3);fill:none;stroke-width:1}
@@ -442,7 +543,7 @@ nav{
 </style>
 </head>
 <body>
- 
+
 <!-- LOADING -->
 <div id="loading">
   <div class="load-logo">
@@ -452,7 +553,7 @@ nav{
   <div class="load-bar-track"><div class="load-bar" id="lb"></div></div>
   <div class="load-status" id="lt">Iniciando...</div>
 </div>
- 
+
 <!-- NAV -->
 <nav>
   <div class="nav-logo">
@@ -469,9 +570,17 @@ nav{
       Historial
       <span class="nbadge" id="hist-badge">0</span>
     </button>
+    <button class="ntab" onclick="goTo('resumenes',this)">
+      <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Resúmenes
+    </button>
     <button class="ntab" onclick="goTo('config',this)">
       <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
       Config
+    </button>
+    <button class="ntab" onclick="goTo('ops',this)" style="margin-left:auto;border-left:1px solid #1a1a1a">
+      <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      Operaciones
     </button>
   </div>
   <div class="nav-right">
@@ -481,7 +590,7 @@ nav{
     <a id="sheet-link" href="#" target="_blank" style="display:none">↗ Sheets</a>
   </div>
 </nav>
- 
+
 <!-- PAGE: POS -->
 <div class="page active" id="page-pos">
   <div class="pos-left">
@@ -501,14 +610,14 @@ nav{
       <div class="pgrid" id="grid"></div>
     </div>
   </div>
- 
+
   <!-- Cart -->
   <div class="cart-panel">
     <div class="cp-header">
       <span class="cp-title">Nueva venta</span>
       <span class="cp-sub" id="vcount">0 ventas hoy</span>
     </div>
- 
+
     <div class="sel-strip" id="sel-strip">
       <div id="sel-img-wrap"></div>
       <div class="sel-info">
@@ -519,7 +628,7 @@ nav{
         <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
- 
+
     <div class="cp-form">
       <div class="fgrp">
         <label class="flabel" for="f-precio">Precio venta bruto (CLP) *</label>
@@ -567,11 +676,18 @@ nav{
         </div>
       </div>
       <div class="fgrp">
+        <label class="flabel" for="f-compra">Valor de compra (CLP) — opcional</label>
+        <div class="price-wrap">
+          <span class="price-pre">$</span>
+          <input class="finput" type="number" id="f-compra" name="valor_compra" placeholder="Solo para registro interno">
+        </div>
+      </div>
+      <div class="fgrp">
         <label class="flabel" for="f-obs">Observaciones</label>
         <input class="finput" type="text" id="f-obs" name="observaciones" placeholder="Ej: pagar Michelle">
       </div>
     </div>
- 
+
     <div class="calc-block">
       <div class="calc-inner">
         <div class="crow"><span class="clabel">Precio bruto</span><span class="cval" id="c-bruto" style="color:var(--orange)">—</span></div>
@@ -582,14 +698,14 @@ nav{
         <div class="crow"><span class="ctlabel">Neto tienda</span><span class="ctval" id="c-neto">—</span></div>
       </div>
     </div>
- 
+
     <div class="cp-footer">
       <button class="sell-btn" id="sell-btn" disabled onclick="registrarVenta()">Registrar venta →</button>
       <button class="clear-btn" onclick="resetForm()">Limpiar formulario</button>
     </div>
   </div>
 </div>
- 
+
 <!-- PAGE: HISTORIAL -->
 <div class="page" id="page-hist">
   <div class="hist-toolbar" id="mes-tabs"></div>
@@ -628,12 +744,84 @@ nav{
     </div>
   </div>
 </div>
- 
+
 <!-- PAGE: CONFIG -->
 <div class="page" id="page-config">
   <div class="config-grid" id="config-grid"></div>
 </div>
- 
+
+<!-- PAGE: RESUMENES -->
+<div class="page" id="page-resumenes">
+  <div class="res-header">
+    <span class="res-header-title">Resúmenes de venta</span>
+    <select class="res-mes-select" id="res-mes-sel" onchange="loadResumenes()"></select>
+  </div>
+  <div class="res-grid" id="res-grid">
+    <div class="res-card" style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;padding:60px">
+      <div class="empty-txt">Selecciona un mes para ver el resumen</div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: OPERACIONES -->
+<div class="page" id="page-ops">
+  <div class="ops-body">
+    <div class="ops-left">
+      <div class="ops-actions">
+        <button class="ops-btn" id="ops-btn-group" onclick="opsRun('/run-group','ops-btn-group','CREAR CARPETAS')">
+          <div>
+            <div class="ops-num">01</div>
+            <div class="ops-label">Crear carpetas</div>
+            <div class="ops-sub">Agrupar imágenes en Drive</div>
+          </div>
+          <span class="ops-arrow">→</span>
+        </button>
+        <button class="ops-btn" id="ops-btn-ingest" onclick="opsRun('/run-ingest','ops-btn-ingest','SUBIR A LA NUBE')">
+          <div>
+            <div class="ops-num">02</div>
+            <div class="ops-label">Subir a la nube</div>
+            <div class="ops-sub">Procesar e ingestar en Supabase</div>
+          </div>
+          <span class="ops-arrow">→</span>
+        </button>
+        <button class="ops-btn" id="ops-btn-shopify" onclick="opsRun('/run-shopify','ops-btn-shopify','PUBLICAR')">
+          <div>
+            <div class="ops-num">03</div>
+            <div class="ops-label">Publicar</div>
+            <div class="ops-sub">Crear drafts en Shopify</div>
+          </div>
+          <span class="ops-arrow">→</span>
+        </button>
+        <button class="ops-btn" id="ops-btn-activate" onclick="opsRun('/run-activate','ops-btn-activate','ACTIVAR')">
+          <div>
+            <div class="ops-num">04</div>
+            <div class="ops-label">Activar</div>
+            <div class="ops-sub">Publicar en Online Store + POS</div>
+          </div>
+          <span class="ops-arrow">→</span>
+        </button>
+      </div>
+    </div>
+    <div class="ops-right">
+      <div class="ops-status-bar">
+        <span class="ops-status-label">Estado <span class="ops-spinner" id="ops-spinner"></span></span>
+        <span class="ops-badge idle" id="ops-badge">Esperando</span>
+      </div>
+      <div class="ops-progress">
+        <div class="ops-pct" id="ops-pct">0%</div>
+        <div class="ops-bar-track"><div class="ops-bar-fill" id="ops-bar"></div></div>
+        <div class="ops-step" id="ops-step">Esperando acción...</div>
+      </div>
+      <div class="ops-log" id="ops-log">
+        <div class="ops-log-entry">
+          <span class="ops-log-time">—</span>
+          <span class="ops-log-msg info">Sistema listo.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: OK -->
 <div class="moverlay" id="modal-ok">
   <div class="modal">
@@ -655,7 +843,7 @@ nav{
     </div>
   </div>
 </div>
- 
+
 <!-- Modal: Edit -->
 <div class="moverlay" id="modal-edit">
   <div class="modal">
@@ -672,31 +860,31 @@ nav{
     </div>
   </div>
 </div>
- 
+
 <div class="toast" id="toast"></div>
- 
+
 <script>
 const API = window.location.origin;
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MES = MESES[new Date().getMonth()];
- 
+
 let CFG = {}, allProducts = [], selectedProd = null;
 let histData = {ventas:[],resumen:{},by_vendedor:{}};
 let mesSel = MES, editingVenta = null, sheetUrl = null, ventasHoy = 0;
- 
+
 // Clock
 document.getElementById('mes-label').textContent = MES.toUpperCase();
 setInterval(()=>{
   document.getElementById('clock').textContent =
     new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 },1000);
- 
+
 // Loading
 function setLoad(p,t){
   document.getElementById('lb').style.width=p+'%';
   document.getElementById('lt').textContent=t;
 }
- 
+
 async function init(){
   setLoad(10,'Cargando configuración...');
   await loadConfig();
@@ -709,7 +897,7 @@ async function init(){
   setLoad(100,'Listo');
   setTimeout(()=>document.getElementById('loading').classList.add('out'),500);
 }
- 
+
 async function loadConfig(){
   try{
     const r=await fetch(`${API}/pos/config`);
@@ -717,14 +905,14 @@ async function loadConfig(){
     populateSelects();
   }catch{toast('Error cargando config','err')}
 }
- 
+
 function populateSelects(){
   document.getElementById('f-vend').innerHTML='<option value="">— Seleccionar —</option>'+
     CFG.vendedores.map(v=>`<option>${v}</option>`).join('');
   document.getElementById('f-prop').innerHTML=CFG.propietarios.map(p=>`<option>${p}</option>`).join('');
   document.getElementById('f-marca').innerHTML=CFG.marcas.map(m=>`<option value="${m.nombre}">${m.nombre}</option>`).join('');
 }
- 
+
 async function loadProducts(){
   try{
     const r=await fetch(`${API}/pos/products`);
@@ -736,7 +924,7 @@ async function loadProducts(){
   }
   renderGrid();
 }
- 
+
 function renderGrid(){
   const q=document.getElementById('search').value.toLowerCase();
   const f=document.querySelector('.pfbtn.active')?.dataset.f||'all';
@@ -744,7 +932,7 @@ function renderGrid(){
   if(q) list=list.filter(p=>p.title.toLowerCase().includes(q));
   if(f==='available') list=list.filter(p=>p.available);
   if(f==='low') list=list.filter(p=>p.stock>0&&p.stock<=2);
- 
+
   document.getElementById('grid').innerHTML=list.length?list.map(p=>{
     const isSel=selectedProd&&selectedProd.id===p.id;
     const sc=p.stock<=0?'sb-no':p.stock<=2?'sb-low':'sb-ok';
@@ -765,7 +953,7 @@ function renderGrid(){
     <div class="empty-txt">Sin productos</div>
   </div>`;
 }
- 
+
 function selectProd(id){
   const p=allProducts.find(x=>x.id===id);
   if(!p||!p.available) return;
@@ -773,7 +961,7 @@ function selectProd(id){
   selectedProd=p;
   document.getElementById('f-precio').value=p.price;
   if(!document.getElementById('f-nombre').value) document.getElementById('f-nombre').value=p.title;
- 
+
   const strip=document.getElementById('sel-strip');
   strip.classList.add('show');
   document.getElementById('sel-name').textContent=p.title;
@@ -781,11 +969,11 @@ function selectProd(id){
   document.getElementById('sel-img-wrap').innerHTML=p.image
     ?`<img class="sel-thumb" src="${p.image}" alt="">`
     :`<div class="sel-thumb-ph"><svg viewBox="0 0 24 24" width="14" height="14" stroke="#999" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>`;
- 
+
   recalc(); renderGrid();
   toast(p.title.split(' ').slice(0,3).join(' ')+' seleccionado','ok');
 }
- 
+
 function deselect(){
   selectedProd=null;
   document.getElementById('sel-strip').classList.remove('show');
@@ -793,7 +981,7 @@ function deselect(){
   document.getElementById('f-nombre').value='';
   recalc(); renderGrid();
 }
- 
+
 function calcular(precio,pago,vendedor){
   precio=parseFloat(precio)||0;
   if(!precio) return null;
@@ -806,7 +994,7 @@ function calcular(precio,pago,vendedor){
   const comV=precio*pctV;
   return{precio,iva,pctB,comB,pctV,comV,neto:precio-iva-comB-comV};
 }
- 
+
 function recalc(){
   const precio=document.getElementById('f-precio').value;
   const pago=document.getElementById('f-pago').value;
@@ -825,9 +1013,9 @@ function recalc(){
   document.getElementById('c-neto').textContent='$'+fmt(Math.round(c.neto));
   document.getElementById('sell-btn').disabled=!vend||!parseFloat(precio);
 }
- 
+
 ['f-pago','f-vend'].forEach(id=>document.getElementById(id).addEventListener('change',recalc));
- 
+
 async function registrarVenta(){
   const precio=parseFloat(document.getElementById('f-precio').value);
   const pago=document.getElementById('f-pago').value;
@@ -837,16 +1025,17 @@ async function registrarVenta(){
   const nombre=document.getElementById('f-nombre').value.trim()||(selectedProd?selectedProd.title:'(sin nombre)');
   const talla=document.getElementById('f-talla').value.trim()||'—';
   const obs=document.getElementById('f-obs').value.trim();
- 
+
   if(!precio){toast('Ingresa el precio','err');return;}
   if(!vend){toast('Selecciona el vendedor','err');return;}
- 
+
   const c=calcular(precio,pago,vend);
   if(!c) return;
- 
+
   const btn=document.getElementById('sell-btn');
   btn.textContent='Procesando...';btn.disabled=true;
- 
+
+  const compra=parseFloat(document.getElementById('f-compra').value)||null;
   const payload={
     timestamp:new Date().toISOString(),
     nombre_prenda:nombre,talla,propietario:prop,vendedor:vend,
@@ -854,11 +1043,13 @@ async function registrarVenta(){
     iva:+c.iva.toFixed(4),pct_com_bancaria:c.pctB,com_bancaria:+c.comB.toFixed(4),
     base_com_vendedor:c.precio,pct_com_vendedor:c.pctV,com_vendedor:+c.comV.toFixed(4),
     neto_tienda:+c.neto.toFixed(4),
+    valor_compra:compra,
+    margen:compra?+(c.neto-compra).toFixed(4):null,
     observaciones:obs,marca,
     shopify_id:selectedProd?.id||null,
     shopify_variant:selectedProd?.variant_id||null,
   };
- 
+
   try{
     const r=await fetch(`${API}/pos/venta`,{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -866,7 +1057,7 @@ async function registrarVenta(){
     });
     const result=await r.json();
     if(!r.ok) throw new Error(result.detail||`HTTP ${r.status}`);
- 
+
     if(selectedProd){
       const pp=allProducts.find(p=>p.id===selectedProd.id);
       if(pp){pp.stock=Math.max(0,pp.stock-1);pp.available=pp.stock>0;}
@@ -874,7 +1065,7 @@ async function registrarVenta(){
     ventasHoy++;
     document.getElementById('vcount').textContent=`${ventasHoy} ventas hoy`;
     document.getElementById('hist-badge').textContent=histData.ventas.length+ventasHoy;
- 
+
     mostrarModalOk({...payload,order_name:result.order_name});
     resetForm();renderGrid();
     loadHistorial(MES);
@@ -886,17 +1077,17 @@ async function registrarVenta(){
   if(!document.getElementById('f-vend').value||!document.getElementById('f-precio').value)
     btn.disabled=true;
 }
- 
+
 function resetForm(){
   selectedProd=null;
   document.getElementById('sel-strip').classList.remove('show');
-  ['f-precio','f-nombre','f-talla','f-obs'].forEach(id=>document.getElementById(id).value='');
+  ['f-precio','f-nombre','f-talla','f-obs','f-compra'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-vend').value='';
   document.getElementById('sell-btn').disabled=true;
   ['c-bruto','c-iva','c-banco','c-cvend','c-neto'].forEach(id=>document.getElementById(id).textContent='—');
   renderGrid();
 }
- 
+
 function mostrarModalOk(v){
   const rows=[
     ['Prenda',v.nombre_prenda],['Talla',v.talla],
@@ -915,16 +1106,16 @@ function mostrarModalOk(v){
   document.getElementById('m-neto').textContent='$'+fmt(Math.round(v.neto_tienda));
   document.getElementById('modal-ok').classList.add('show');
 }
- 
+
 function closeModal(id){document.getElementById(id).classList.remove('show')}
- 
+
 // ── Historial
 function buildMesTabs(){
   document.getElementById('mes-tabs').innerHTML=MESES.map(m=>
     `<button class="mes-btn${m===mesSel?' active':''}" onclick="cambiarMes('${m}',this)">${m}</button>`
   ).join('');
 }
- 
+
 async function loadHistorial(mes){
   try{
     const r=await fetch(`${API}/pos/historial/${mes}`);
@@ -934,14 +1125,14 @@ async function loadHistorial(mes){
   }catch{histData={ventas:[],resumen:{},by_vendedor:{}};}
   renderHistorial();
 }
- 
+
 async function cambiarMes(mes,btn){
   mesSel=mes;
   document.querySelectorAll('.mes-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   await loadHistorial(mes);
 }
- 
+
 function renderHistorial(){
   const v=histData.ventas||[];
   document.getElementById('hist-tbody').innerHTML=v.length?v.map(venta=>{
@@ -971,7 +1162,7 @@ function renderHistorial(){
     <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
     <div class="empty-txt">Sin ventas en ${mesSel}</div>
   </div></td></tr>`;
- 
+
   const rs=histData.resumen||{};
   document.getElementById('resumen-block').innerHTML=rs.total_ventas!=null?`
     <div class="rb-row"><span class="rb-label">Total ventas</span><span class="rb-val">${rs.total_ventas}</span></div>
@@ -982,7 +1173,7 @@ function renderHistorial(){
     <div class="rb-row"><span class="rb-label" style="font-weight:600;color:var(--text)">Neto tienda</span>
       <span class="rb-val" style="font-size:18px;font-weight:700;color:var(--text)">$${fmt(rs.total_neto)}</span>
     </div>`:`<div class="empty-state" style="padding:16px 0"><div class="empty-txt">Sin datos</div></div>`;
- 
+
   const bv=histData.by_vendedor||{};
   document.getElementById('vendedor-block').innerHTML=Object.keys(bv).length
     ?Object.entries(bv).sort((a,b)=>b[1].bruto-a[1].bruto).map(([name,d])=>`
@@ -996,7 +1187,7 @@ function renderHistorial(){
       </div>`).join('')
     :`<div style="padding:12px 0;font-size:9px;color:var(--gray4)">Sin datos</div>`;
 }
- 
+
 function editarVenta(venta){
   editingVenta=venta;
   const vendOpts=CFG.vendedores.map(v=>`<option${v===venta.vendedor?' selected':''}>${v}</option>`).join('');
@@ -1028,7 +1219,7 @@ function editarVenta(venta){
     <div class="edit-grp"><label class="flabel">Observaciones</label><input class="finput" id="e-obs" value="${esc(venta.observaciones||'')}"></div>`;
   document.getElementById('modal-edit').classList.add('show');
 }
- 
+
 async function guardarEdicion(){
   const precio=parseFloat(document.getElementById('e-precio').value)||0;
   const pago=document.getElementById('e-pago').value;
@@ -1055,7 +1246,7 @@ async function guardarEdicion(){
     await loadHistorial(mesSel);
   }catch{toast('Error al actualizar','err');}
 }
- 
+
 async function eliminarVenta(mes,rowIdx){
   if(!confirm('¿Eliminar esta venta?')) return;
   try{
@@ -1065,7 +1256,7 @@ async function eliminarVenta(mes,rowIdx){
     await loadHistorial(mesSel);
   }catch{toast('Error al eliminar','err');}
 }
- 
+
 // ── Config
 function renderConfigPage(){
   const extVend=CFG.vendedores_externos||[];
@@ -1130,7 +1321,7 @@ function renderConfigPage(){
       </div>
     </div>`;
 }
- 
+
 async function patchConfig(partial){
   try{
     const r=await fetch(`${API}/pos/config`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(partial)});
@@ -1145,7 +1336,7 @@ function addMarca(){const n=document.getElementById('new-marca-n').value.trim();
 function removeMarca(i){const m=[...CFG.marcas];m.splice(i,1);patchConfig({marcas:m});}
 function updateMarcaPct(i,val){const m=[...CFG.marcas];m[i].comision=parseFloat(val)/100||0;patchConfig({marcas:m});}
 function saveComExt(){const p=parseFloat(document.getElementById('com-ext-pct').value)/100||0.05;patchConfig({com_externo_pct:p});}
- 
+
 // ── Export
 function exportCSV(){
   const v=histData.ventas||[];
@@ -1162,7 +1353,7 @@ function exportCSV(){
   a.download=`LeSang_${mesSel}_ventas.csv`;a.click();
   toast('CSV exportado','ok');
 }
- 
+
 async function loadSheetUrl(){
   try{
     const r=await fetch(`${API}/pos/sheet-url`);
@@ -1171,7 +1362,7 @@ async function loadSheetUrl(){
   }catch{}
 }
 function openSheet(){if(sheetUrl)window.open(sheetUrl,'_blank');else toast('Google Sheet no configurado','err');}
- 
+
 // ── Nav
 function goTo(name,btn){
   document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
@@ -1180,8 +1371,221 @@ function goTo(name,btn){
   document.getElementById('page-'+name).classList.add('active');
   if(name==='hist'){buildMesTabs();renderHistorial();}
   if(name==='config') renderConfigPage();
+  if(name==='resumenes') initResumenes();
 }
- 
+
+// ── RESUMENES ─────────────────────────────────────────────────────────────────
+function initResumenes(){
+  const sel=document.getElementById('res-mes-sel');
+  if(!sel.innerHTML){
+    sel.innerHTML=MESES.map(m=>`<option${m===MES?' selected':''}>${m}</option>`).join('');
+  }
+  loadResumenes();
+}
+
+async function loadResumenes(){
+  const mes=document.getElementById('res-mes-sel').value||MES;
+  const grid=document.getElementById('res-grid');
+  grid.innerHTML=`<div class="res-card" style="grid-column:1/-1;padding:40px;text-align:center"><div class="empty-txt">Cargando ${mes}...</div></div>`;
+  try{
+    const r=await fetch(`${API}/pos/historial/${mes}`);
+    const d=await r.json();
+    renderResumenes(d,mes);
+  }catch{
+    grid.innerHTML=`<div class="res-card" style="grid-column:1/-1;padding:40px;text-align:center"><div class="empty-txt">Error cargando datos</div></div>`;
+  }
+}
+
+function renderResumenes(d,mes){
+  const v=d.ventas||[];
+  const rs=d.resumen||{};
+  const bv=d.by_vendedor||{};
+  const grid=document.getElementById('res-grid');
+
+  if(!v.length){
+    grid.innerHTML=`<div class="res-card" style="grid-column:1/-1;padding:60px;text-align:center"><div class="empty-txt">Sin ventas en ${mes}</div></div>`;
+    return;
+  }
+
+  // Resumen tienda
+  const tiendaCard=`<div class="res-card">
+    <div class="res-card-title">Tienda — ${mes}</div>
+    <div class="res-big orange">\$${fmt(rs.total_bruto||0)}</div>
+    <div class="res-sub">TOTAL BRUTO</div>
+    <div style="height:12px"></div>
+    <div class="res-stat"><span class="res-stat-label">Ventas totales</span><span class="res-stat-val">${rs.total_ventas||0}</span></div>
+    <div class="res-stat"><span class="res-stat-label">IVA total</span><span class="res-stat-val red">-\$${fmt(rs.total_iva||0)}</span></div>
+    <div class="res-stat"><span class="res-stat-label">Com. bancaria</span><span class="res-stat-val red">-\$${fmt(Math.round(v.reduce((s,x)=>s+x.com_bancaria,0)))}</span></div>
+    <div class="res-stat"><span class="res-stat-label">Com. vendedores</span><span class="res-stat-val red">-\$${fmt(rs.total_com_vendedor||0)}</span></div>
+    <div class="res-stat" style="margin-top:4px;padding-top:8px;border-top:2px solid var(--black)">
+      <span class="res-stat-label" style="font-weight:700;color:var(--text)">Neto tienda</span>
+      <span class="res-stat-val" style="font-size:18px">\$${fmt(rs.total_neto||0)}</span>
+    </div>
+  </div>`;
+
+  // Margen real (si hay valor de compra)
+  const conCompra=v.filter(x=>x.valor_compra&&x.valor_compra>0);
+  const margenCard=conCompra.length?`<div class="res-card">
+    <div class="res-card-title">Margen real (${conCompra.length} ventas con costo)</div>
+    <div class="res-big green">\$${fmt(Math.round(conCompra.reduce((s,x)=>s+(x.neto_tienda-(x.valor_compra||0)),0)))}</div>
+    <div class="res-sub">GANANCIA NETA ESTIMADA</div>
+    <div style="height:12px"></div>
+    ${conCompra.map(x=>`
+      <div class="res-stat">
+        <span class="res-stat-label" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.nombre_prenda)}</span>
+        <span class="res-stat-val green">+\$${fmt(Math.round(x.neto_tienda-(x.valor_compra||0)))}</span>
+      </div>`).join('')}
+  </div>`:'';
+
+  // Por marca
+  const marcas={};
+  v.forEach(x=>{
+    const m=x.marca||'Tienda';
+    if(!marcas[m]) marcas[m]={ventas:0,bruto:0,comision_tienda:0,neto_marca:0};
+    marcas[m].ventas++;
+    marcas[m].bruto+=x.precio_bruto;
+    // Comisión tienda sobre marcas externas (25% hardcoded, idealmente desde CFG)
+    const esExt=!['Tienda',''].includes(m);
+    const com=esExt?x.precio_bruto*0.25:x.neto_tienda;
+    marcas[m].comision_tienda+=com;
+  });
+
+  const marcasCard=`<div class="res-card">
+    <div class="res-card-title">Por marca</div>
+    ${Object.entries(marcas).sort((a,b)=>b[1].bruto-a[1].bruto).map(([nombre,md])=>`
+      <div class="res-marca-row">
+        <div class="res-marca-name">${esc(nombre)}</div>
+        <div class="res-marca-stats">
+          <div class="res-marca-stat"><strong>${md.ventas}</strong>ventas</div>
+          <div class="res-marca-stat"><strong>\$${fmt(md.bruto)}</strong>bruto</div>
+          <div class="res-marca-stat oran"><strong>\$${fmt(Math.round(md.comision_tienda))}</strong>${nombre==='Tienda'?'neto':'com. tienda'}</div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+
+  // Comisiones vendedores
+  const extVend=CFG.vendedores_externos||[];
+  const vendCom=Object.entries(bv).filter(([n])=>extVend.includes(n));
+  const vendCard=`<div class="res-card">
+    <div class="res-card-title">Comisiones vendedoras</div>
+    ${vendCom.length?vendCom.sort((a,b)=>b[1].comision-a[1].comision).map(([name,dd])=>`
+      <div class="res-vend-row">
+        <div>
+          <div class="res-vend-name">${esc(name)}</div>
+          <div style="font-size:9px;color:var(--gray4)">${dd.ventas} ventas · \$${fmt(dd.bruto)} bruto</div>
+        </div>
+        <div class="res-vend-com">\$${fmt(Math.round(dd.comision))}</div>
+      </div>`).join('')
+    :`<div class="res-empty">Sin comisiones este mes</div>`}
+  </div>`;
+
+  // Top productos
+  const byProd={};
+  v.forEach(x=>{
+    if(!byProd[x.nombre_prenda]) byProd[x.nombre_prenda]={ventas:0,bruto:0};
+    byProd[x.nombre_prenda].ventas++;
+    byProd[x.nombre_prenda].bruto+=x.precio_bruto;
+  });
+  const topCard=`<div class="res-card">
+    <div class="res-card-title">Top productos</div>
+    ${Object.entries(byProd).sort((a,b)=>b[1].bruto-a[1].bruto).slice(0,8).map(([nombre,pd])=>`
+      <div class="res-stat">
+        <span class="res-stat-label" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nombre)}</span>
+        <span class="res-stat-val orange">\$${fmt(pd.bruto)}</span>
+      </div>`).join('')}
+  </div>`;
+
+  grid.innerHTML=tiendaCard+marcasCard+vendCard+(margenCard||topCard);
+}
+
+// ── OPERACIONES ────────────────────────────────────────────────────────────────
+let opsPollInterval=null, opsPrevLog='';
+
+function opsLog(msg,type=''){
+  const log=document.getElementById('ops-log');
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const time=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  const el=document.createElement('div');
+  el.className='ops-log-entry';
+  el.innerHTML=`<span class="ops-log-time">${time}</span><span class="ops-log-msg ${type}">${msg}</span>`;
+  log.appendChild(el);
+  log.scrollTop=log.scrollHeight;
+}
+
+function opsSetBadge(state){
+  const b=document.getElementById('ops-badge');
+  b.className='ops-badge '+state;
+  b.textContent={idle:'Esperando',running:'En curso',done:'Completado',error:'Error'}[state]||state;
+}
+
+function opsSetProgress(pct,step){
+  document.getElementById('ops-pct').textContent=Math.round(pct)+'%';
+  const bar=document.getElementById('ops-bar');
+  bar.style.width=pct+'%';
+  if(pct>=100) bar.classList.add('done'); else bar.classList.remove('done');
+  if(step) document.getElementById('ops-step').textContent=step.toUpperCase();
+}
+
+function opsSetAllDisabled(dis){
+  ['ops-btn-group','ops-btn-ingest','ops-btn-shopify','ops-btn-activate'].forEach(id=>{
+    document.getElementById(id).disabled=dis;
+  });
+}
+
+function opsProcessLog(fullLog){
+  const newText=fullLog.slice(opsPrevLog.length);
+  opsPrevLog=fullLog;
+  newText.split('\n').filter(l=>l.trim()).forEach(line=>{
+    if(/^=+$/.test(line.trim())) return;
+    const t=line.includes('✔')?'ok':line.includes('✘')?'error':line.startsWith('  ')?'info':'ok';
+    opsLog(line.trim(),t);
+  });
+}
+
+async function opsRun(endpoint,btnId,label){
+  opsSetAllDisabled(true);
+  ['ops-btn-group','ops-btn-ingest','ops-btn-shopify','ops-btn-activate'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById(btnId).classList.add('active');
+  opsSetBadge('running');
+  opsSetProgress(0,'Iniciando...');
+  opsPrevLog='';
+  document.getElementById('ops-spinner').classList.add('on');
+  opsLog('→ Iniciando: '+label,'accent');
+  try{
+    const res=await fetch(endpoint,{method:'POST'});
+    const data=await res.json();
+    if(!data.ok){
+      opsSetBadge('error');
+      opsLog('✘ '+data.message,'error');
+      opsSetAllDisabled(false);
+      document.getElementById('ops-spinner').classList.remove('on');
+      return;
+    }
+    opsPollInterval=setInterval(async()=>{
+      try{
+        const r=await fetch('/status');
+        const d=await r.json();
+        opsSetProgress(d.progress,d.step);
+        opsSetBadge(d.status);
+        if(d.log) opsProcessLog(d.log);
+        if(d.status==='done'||d.status==='error'){
+          clearInterval(opsPollInterval);
+          opsSetAllDisabled(false);
+          ['ops-btn-group','ops-btn-ingest','ops-btn-shopify','ops-btn-activate'].forEach(id=>document.getElementById(id).classList.remove('active'));
+          document.getElementById('ops-spinner').classList.remove('on');
+          opsLog(d.status==='done'?'Proceso completado.':'Error en el proceso.', d.status==='done'?'accent':'error');
+        }
+      }catch{}
+    },500);
+  }catch(e){
+    opsSetBadge('error');
+    opsLog('✘ Error: '+e.message,'error');
+    opsSetAllDisabled(false);
+    document.getElementById('ops-spinner').classList.remove('on');
+  }
+}
+
 document.querySelectorAll('.pfbtn').forEach(b=>{
   b.addEventListener('click',()=>{
     document.querySelectorAll('.pfbtn').forEach(x=>x.classList.remove('active'));
@@ -1189,7 +1593,7 @@ document.querySelectorAll('.pfbtn').forEach(b=>{
   });
 });
 document.getElementById('search').addEventListener('input',renderGrid);
- 
+
 function fmt(n){return Math.round(n).toLocaleString('es-CL')}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 let tt;
@@ -1200,7 +1604,7 @@ function toast(msg,type=''){
   requestAnimationFrame(()=>requestAnimationFrame(()=>t.classList.add('show')));
   tt=setTimeout(()=>t.classList.remove('show'),2800);
 }
- 
+
 init();
 </script>
 </body>

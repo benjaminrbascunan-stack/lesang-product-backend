@@ -25,7 +25,8 @@ HEADERS = [
     "% comisión bancaria", "$ comisión bancaria",
     "Base comisión vendedor", "% comisión vendedor", "$ comisión vendedor",
     "Neto tienda", "Observaciones", "Marca (Tienda/externa)",
-    "Fecha", "Hora", "Orden Shopify"
+    "Fecha", "Hora", "Orden Shopify",
+    "Valor de compra", "Margen real"
 ]
 
 # Columnas de resumen (lado derecho, col R en adelante)
@@ -351,25 +352,29 @@ def _data_row(venta: dict) -> list:
         fecha = venta.get("fecha", "")
         hora  = venta.get("hora", "")
 
+    vc = venta.get("valor_compra") or ""
+    margen = venta.get("margen") or ""
     return [
         venta.get("nombre_prenda", ""),
         venta.get("talla", "—"),
         venta.get("propietario", ""),
         venta.get("vendedor", ""),
-        venta.get("precio_bruto", 0),
+        float(venta.get("precio_bruto", 0)),       # número puro
         venta.get("tipo_pago", ""),
-        round(venta.get("iva", 0), 2),
-        venta.get("pct_com_bancaria", 0),
-        round(venta.get("com_bancaria", 0), 2),
-        venta.get("base_com_vendedor", 0),
-        venta.get("pct_com_vendedor", 0),
-        round(venta.get("com_vendedor", 0), 2),
-        round(venta.get("neto_tienda", 0), 2),
+        float(round(venta.get("iva", 0), 2)),       # número puro
+        float(venta.get("pct_com_bancaria", 0)),
+        float(round(venta.get("com_bancaria", 0), 2)),
+        float(venta.get("base_com_vendedor", 0)),
+        float(venta.get("pct_com_vendedor", 0)),
+        float(round(venta.get("com_vendedor", 0), 2)),
+        float(round(venta.get("neto_tienda", 0), 2)),
         venta.get("observaciones", ""),
         venta.get("marca", ""),
         fecha,
         hora,
         venta.get("order_name", "") or "",
+        float(vc) if vc != "" else "",              # valor compra (opcional)
+        float(margen) if margen != "" else "",      # margen (opcional)
     ]
 
 
@@ -493,6 +498,8 @@ def get_ventas_mes(mes: str) -> list:
                 "fecha":              row[15],
                 "hora":               row[16],
                 "order_name":         row[17] if len(row) > 17 else "",
+                "valor_compra":       to_float(row[18]) if len(row) > 18 and row[18] else None,
+                "margen":             to_float(row[19]) if len(row) > 19 and row[19] else None,
             })
         except Exception as e:
             print(f"[Sheets] error leyendo fila {i}: {e}")
