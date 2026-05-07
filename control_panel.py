@@ -304,6 +304,7 @@ async def pos_get_products():
 async def pos_registrar_venta(venta: VentaIn):
     from datetime import datetime
     v = venta.dict()
+    print(f"[POS] venta recibida: precio={v.get('precio_bruto')} vendedor={v.get('vendedor')} variant={v.get('shopify_variant','')[:30] if v.get('shopify_variant') else None}")
     if not v.get("timestamp"):
         v["timestamp"] = datetime.now().isoformat()
 
@@ -312,49 +313,50 @@ async def pos_registrar_venta(venta: VentaIn):
         try:
             loc_gid = f"gid://shopify/Location/{LOCATION_ID}"
 
-            # 1. Obtener inventoryItem id + stock actual (API 2026-04 requiere changeFromQuantity)
-            q_stock = """
-            query GetInvItem($vid: ID!, $loc: ID!) {
-              productVariant(id: $vid) {
-                inventoryItem {
-                  id
-                  inventoryLevel(locationId: $loc) {
-                    quantities(names: ["available"]) { name quantity }
-                  }
-                }
-              }
-            }"""
+            # 1. Obtener inventoryItem id + stock actual
+            loc_gid = f"gid://shopify/Location/{LOCATION_ID}"
+            q_stock = (
+                "query GetInvItem($vid: ID!, $loc: ID!) {"
+                "  productVariant(id: $vid) {"
+                "    inventoryItem {"
+                "      id"
+                "      inventoryLevel(locationId: $loc) {"
+                "        quantities(names: [\"available\"]) { name quantity }"
+                "      }"
+                "    }"
+                "  }"
+                "}"
+            )
             vd = await gql(q_stock, {"vid": v["shopify_variant"], "loc": loc_gid})
             inv_item    = vd["productVariant"]["inventoryItem"]
             inv_id      = inv_item["id"]
             level       = inv_item.get("inventoryLevel") or {}
             qtys        = level.get("quantities") or []
             current_qty = next((q["quantity"] for q in qtys if q["name"] == "available"), 0)
+            new_qty     = max(0, current_qty - 1)
 
-            # 2. Descontar -1 con idempotencyKey requerido por API 2026-04
-            ikey = f"pos-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-            m_adjust = (
-                "mutation AdjustInv($input: InventoryAdjustQuantitiesInput!)"
-                f" @idempotent(key: \"{ikey}\") {{"
-                "  inventoryAdjustQuantities(input: $input) {"
+            # 2. Setear el nuevo stock directamente (más simple, sin @idempotent)
+            m_set = (
+                "mutation SetInv($input: InventorySetOnHandQuantitiesInput!) {"
+                "  inventorySetOnHandQuantities(input: $input) {"
                 "    userErrors { field message }"
                 "    inventoryAdjustmentGroup { changes { quantityAfterChange } }"
                 "  }"
-                "}}"
+                "}"
             )
-            adj_result = await gql(m_adjust, {"input": {
+            set_result = await gql(m_set, {"input": {
                 "reason": "correction",
-                "name": f"POS {datetime.now().strftime('%Y%m%d-%H%M%S')}",
-                "changes": [{
+                "setQuantities": [{
                     "inventoryItemId": inv_id,
                     "locationId": loc_gid,
-                    "delta": -1,
-                    "changeFromQuantity": current_qty,
+                    "quantity": new_qty,
                 }]
             }})
-            errs = adj_result["inventoryAdjustQuantities"]["userErrors"]
+            errs = set_result["inventorySetOnHandQuantities"]["userErrors"]
             if errs:
                 print(f"[Shopify] inventory userErrors: {errs}")
+            else:
+                print(f"[Shopify] stock actualizado: {current_qty} -> {new_qty}")
 
             # 3. Draft order para historial
             m_draft = """
