@@ -32,10 +32,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Mantener este mismo scope en todos los scripts para no tener que reautorizar.
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-# Carpeta madre donde están las carpetas ya ordenadas por producto.
 FOLDER_ID = "1yfADUnnIXsCTqRI7wcZ6ctao60VHXu-R"
 
 CACHE_TABLE = "ingest_groups_cache"
@@ -47,7 +45,6 @@ PRODUCT_ANALYSIS_QUALITY = 78
 PRODUCT_VALIDATION_MAX_SIZE = 1024
 PRODUCT_VALIDATION_QUALITY = 78
 
-# Si una carpeta tiene una mezcla evidente, no crea item.
 VALIDATION_CONFIDENCE_MIN = 0.75
 FABRIC_MATCH_MIN = 0.70
 
@@ -91,6 +88,13 @@ BANNED_MARKETING_TERMS = [
     "estilo único",
 ]
 
+# Términos de moda que quedan en inglés en títulos
+ENGLISH_FASHION_TERMS = {
+    "hoodie", "crewneck", "sweatshirt", "blazer", "trench",
+    "bomber", "parka", "windbreaker", "cardigan", "knit",
+    "loafers", "sneakers", "boots", "mules", "slides",
+    "clutch", "tote", "crossbody",
+}
 
 # =========================
 # HELPERS
@@ -136,25 +140,17 @@ def get_drive_service():
 
     creds = None
 
-    # ===============================
-    # MODO NUBE (Railway)
-    # ===============================
     token_json = os.getenv("GOOGLE_TOKEN_JSON")
 
     if token_json:
         print("Usando autenticación desde variables (nube)...")
-
         creds = Credentials.from_authorized_user_info(
             json.loads(token_json),
             ["https://www.googleapis.com/auth/drive"]
         )
-
         print("✔ Google Drive conectado (nube)\n")
         return build("drive", "v3", credentials=creds)
 
-    # ===============================
-    # MODO LOCAL
-    # ===============================
     print("Usando autenticación local...")
 
     from google.auth.transport.requests import Request
@@ -173,7 +169,6 @@ def get_drive_service():
             print("Abriendo autenticación de Google...")
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
-
         with open("token.json", "w") as token:
             token.write(creds.to_json())
 
@@ -208,10 +203,8 @@ def list_product_folders(service) -> list[dict]:
             )
             .execute()
         )
-
         folders.extend(response.get("files", []))
         page_token = response.get("nextPageToken")
-
         if not page_token:
             break
 
@@ -240,10 +233,8 @@ def list_images_in_folder(service, folder_id: str) -> list[dict]:
             )
             .execute()
         )
-
         files.extend(response.get("files", []))
         page_token = response.get("nextPageToken")
-
         if not page_token:
             break
 
@@ -252,47 +243,34 @@ def list_images_in_folder(service, folder_id: str) -> list[dict]:
 
 
 # =========================
-# IMAGE DOWNLOAD / COMPRESSION / SUPABASE CACHE
+# IMAGE DOWNLOAD / COMPRESSION / CACHE
 # =========================
 
 def download_drive_file_bytes(service, file_id: str) -> bytes:
     request = service.files().get_media(fileId=file_id)
     file_buffer = BytesIO()
     downloader = MediaIoBaseDownload(file_buffer, request)
-
     done = False
     while not done:
         _, done = downloader.next_chunk()
-
     return file_buffer.getvalue()
 
 
 def compress_image_for_ai(file_bytes: bytes, max_size: int = 1024, quality: int = 78) -> bytes:
     image = Image.open(BytesIO(file_bytes))
     image = ImageOps.exif_transpose(image)
-
     if image.mode not in ("RGB", "L"):
         image = image.convert("RGB")
     elif image.mode == "L":
         image = image.convert("RGB")
-
     image.thumbnail((max_size, max_size))
-
     output = BytesIO()
-    image.save(
-        output,
-        format="JPEG",
-        quality=quality,
-        optimize=True,
-        progressive=True,
-    )
-
+    image.save(output, format="JPEG", quality=quality, optimize=True, progressive=True)
     return output.getvalue()
 
 
 def get_cached_compressed_image_from_supabase(service, file: dict, max_size: int, quality: int) -> bytes:
     cache_path = f"{file['id']}_{max_size}_{quality}.jpg"
-
     try:
         cached = supabase.storage.from_(IMAGE_CACHE_BUCKET).download(cache_path)
         print(f"  usando cache Supabase: {cache_path}")
@@ -301,52 +279,34 @@ def get_cached_compressed_image_from_supabase(service, file: dict, max_size: int
         pass
 
     original_bytes = download_drive_file_bytes(service, file["id"])
-    compressed_bytes = compress_image_for_ai(
-        original_bytes,
-        max_size=max_size,
-        quality=quality,
-    )
+    compressed_bytes = compress_image_for_ai(original_bytes, max_size=max_size, quality=quality)
 
     supabase.storage.from_(IMAGE_CACHE_BUCKET).upload(
         cache_path,
         compressed_bytes,
-        {
-            "content-type": "image/jpeg",
-            "upsert": "true",
-        },
+        {"content-type": "image/jpeg", "upsert": "true"},
     )
-
     print(
         f"  comprimida y subida a Supabase | "
         f"original: {round(len(original_bytes) / 1024)} KB | "
         f"IA: {round(len(compressed_bytes) / 1024)} KB"
     )
-
     return compressed_bytes
 
 
 def build_openai_image_inputs(service, images: list[dict], max_size: int, quality: int) -> list[dict]:
     print("Preparando imágenes comprimidas para OpenAI...\n")
-
     content = []
-
     for idx, file in enumerate(images):
         print(f"Usando imagen {idx}: {file['name']} | id={file['id']}")
-
         compressed_bytes = get_cached_compressed_image_from_supabase(
-            service=service,
-            file=file,
-            max_size=max_size,
-            quality=quality,
+            service=service, file=file, max_size=max_size, quality=quality,
         )
-
         base64_image = base64.b64encode(compressed_bytes).decode("utf-8")
-
         content.append({
             "type": "input_image",
             "image_url": f"data:image/jpeg;base64,{base64_image}",
         })
-
     print("\nImágenes preparadas.\n")
     return content
 
@@ -379,7 +339,6 @@ def get_cache_record(group_signature: str):
         .limit(1)
         .execute()
     )
-
     rows = response.data or []
     return rows[0] if rows else None
 
@@ -403,13 +362,11 @@ def upsert_cache_record(
         "confidence": confidence,
         "updated_at": now_iso(),
     }
-
     response = (
         supabase.table(CACHE_TABLE)
         .upsert(payload, on_conflict="group_signature")
         .execute()
     )
-
     return response.data
 
 
@@ -424,48 +381,28 @@ def build_signature_from_image_data(image_data: list[dict]) -> str:
 
 def find_existing_item_by_images(image_data: list[dict]):
     signature_to_find = build_signature_from_image_data(image_data)
-
     response = supabase.table("items").select("*").execute()
     items = response.data or []
-
     for item in items:
         existing_images = item.get("image_urls") or []
-
         if not isinstance(existing_images, list):
             continue
-
         existing_signature = build_signature_from_image_data(existing_images)
-
         if existing_signature == signature_to_find:
             return item
-
     return None
 
 
 def item_is_complete(item: dict) -> bool:
     if not item:
         return False
-
-    required_fields = [
-        "title",
-        "brand",
-        "category",
-        "size",
-        "ai_description",
-        "shopify_category",
-    ]
-
+    required_fields = ["title", "brand", "category", "size", "ai_description", "shopify_category"]
     for field in required_fields:
         value = item.get(field)
-
         if value is None:
             return False
-
-        if isinstance(value, str):
-            cleaned = value.strip()
-            if cleaned == "":
-                return False
-
+        if isinstance(value, str) and value.strip() == "":
+            return False
     return True
 
 
@@ -475,29 +412,35 @@ def item_is_complete(item: dict) -> bool:
 
 def map_shopify_category(category: str) -> str:
     c = category.strip().lower()
-
     if c in {
         "hoodie", "sweatshirt", "crewneck", "t-shirt", "shirt", "polo",
         "knit", "jacket", "coat", "blazer", "vest", "top", "cardigan",
-        "sweater", "zip hoodie", "zip-up hoodie", "denim jacket",
+        "sweater", "zip hoodie", "zip-up hoodie", "denim jacket", "chaqueta",
+        "abrigo", "campera", "remera", "camiseta", "camisa", "chaleco",
     }:
         return "SUPERIOR"
-
     if c in {
         "pants", "jeans", "shorts", "skirt", "trousers", "cargo pants",
-        "denim pants", "denim", "jean",
+        "denim pants", "denim", "jean", "pantalón", "pantalon", "falda",
+        "short", "bermuda",
     }:
         return "INFERIOR"
-
-    if c in {"shoes", "sneakers", "boots", "loafers", "sandals"}:
+    if c in {
+        "shoes", "sneakers", "boots", "loafers", "sandals", "zapatos",
+        "botas", "zapatillas", "sandalias",
+    }:
         return "ZAPATOS"
-
-    if c in {"bag", "belt", "hat", "scarf", "wallet", "jewelry", "accessory", "sunglasses"}:
+    if c in {
+        "bag", "belt", "hat", "scarf", "wallet", "jewelry", "accessory",
+        "sunglasses", "cartera", "bolso", "cinturón", "sombrero", "bufanda",
+        "billetera", "lentes", "accesorio",
+    }:
         return "ACCESORIOS"
-
-    if c in {"jersey", "track jacket", "sportswear", "activewear", "track pants"}:
+    if c in {
+        "jersey", "track jacket", "sportswear", "activewear", "track pants",
+        "deportivo",
+    }:
         return "DEPORTIVO"
-
     return "ACCESORIOS"
 
 
@@ -514,7 +457,6 @@ def force_spanish(text: str) -> str:
             + text
         ),
     )
-
     return response.output_text.strip()
 
 
@@ -522,19 +464,18 @@ def rewrite_editorial_description(text: str) -> str:
     response = client.responses.create(
         model="gpt-4o",
         input=(
-            "Reescribe este texto en español para Lé Sang, con tono de archivo/catálogo.\n\n"
-            "Reglas estrictas:\n"
-            "- No uses lenguaje de venta.\n"
-            "- No uses: descubre, perfecto, ideal, elegante, sofisticado, guardarropa, ocasión.\n"
+            "Reescribe este texto para Lé Sang, con tono de archivo/catálogo editorial.\n\n"
+            "Reglas:\n"
+            "- Voz de alguien que conoce la historia de la moda.\n"
+            "- Sin lenguaje de venta.\n"
+            "- Sin: descubre, perfecto, ideal, elegante, sofisticado, guardarropa, ocasión.\n"
             "- No inventes información.\n"
-            "- Frases cortas.\n"
-            "- Prioriza tipo de prenda, marca, color/material, detalles visibles y estado.\n"
+            "- Podés mencionar el período o contexto de la marca si es relevante.\n"
             "- Máximo 3 frases.\n\n"
             "Texto a reescribir:\n"
             f"{text}"
         ),
     )
-
     return response.output_text.strip()
 
 
@@ -544,7 +485,6 @@ def clean_editorial_text(text: str) -> str:
         return "Descripción pendiente."
 
     lowered = cleaned.lower()
-
     should_rewrite = any(term in lowered for term in BANNED_MARKETING_TERMS)
     should_rewrite = should_rewrite or any(
         word in lowered
@@ -555,7 +495,6 @@ def clean_editorial_text(text: str) -> str:
         print("Reescribiendo descripción a tono editorial Lé Sang...")
         cleaned = rewrite_editorial_description(cleaned)
 
-    # Normaliza exceso de líneas.
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     return cleaned
 
@@ -564,13 +503,18 @@ def clean_notes_text(text: str) -> str:
     cleaned = (text or "").strip()
     if not cleaned:
         return ""
-
     lowered = cleaned.lower()
     if any(word in lowered for word in [" the ", " with ", " and ", " made ", "visible", "label", "wear"]):
         print("Reescribiendo notas al español...")
         cleaned = force_spanish(cleaned)
-
     return cleaned.strip()
+
+
+def build_size_line(size: str) -> str:
+    """Devuelve la línea de talla para incluir en la descripción."""
+    if not size or size.strip().lower() in ("pendiente", ""):
+        return "Talla: "
+    return f"Talla: {size.strip()}"
 
 
 # =========================
@@ -587,9 +531,7 @@ def validate_folder_product_with_ai(service, folder: dict, images: list[dict]) -
         quality=PRODUCT_VALIDATION_QUALITY,
     )
 
-    image_lines = []
-    for index, image in enumerate(images):
-        image_lines.append(f"{index}: {image['name']} | id={image['id']}")
+    image_lines = [f"{index}: {image['name']} | id={image['id']}" for index, image in enumerate(images)]
 
     response = client.responses.create(
         model="gpt-4o",
@@ -643,15 +585,10 @@ def validate_folder_product_with_ai(service, folder: dict, images: list[dict]) -
                         },
                     },
                     "required": [
-                        "is_single_product",
-                        "confidence",
-                        "same_color_likely",
-                        "same_brand_likely",
-                        "same_category_likely",
-                        "label_color_matches_product",
-                        "fabric_match_confidence",
-                        "reason",
-                        "suspected_multiple_products",
+                        "is_single_product", "confidence", "same_color_likely",
+                        "same_brand_likely", "same_category_likely",
+                        "label_color_matches_product", "fabric_match_confidence",
+                        "reason", "suspected_multiple_products",
                     ],
                     "additionalProperties": False,
                 },
@@ -660,11 +597,9 @@ def validate_folder_product_with_ai(service, folder: dict, images: list[dict]) -
     )
 
     result = json.loads(response.output_text)
-
     print("Resultado validación carpeta:")
     print(json.dumps(result, indent=2, ensure_ascii=False))
     print()
-
     return result
 
 
@@ -678,30 +613,56 @@ def analyze_folder_product_with_ai(service, folder: dict, images: list[dict]) ->
         quality=PRODUCT_ANALYSIS_QUALITY,
     )
 
-    image_lines = []
-    for index, image in enumerate(images):
-        image_lines.append(f"{index}: {image['name']} | id={image['id']}")
+    image_lines = [f"{index}: {image['name']} | id={image['id']}" for index, image in enumerate(images)]
 
     response = client.responses.create(
         model="gpt-4o",
         instructions=(
-            "Eres parte del equipo editorial de Lé Sang. "
-            "Analiza UNA prenda de vestir para un catálogo de moda de diseñador/archivo. "
-            "La carpeta fue separada manualmente por producto, así que debes extraer la mayor cantidad de información útil. "
-            "No inventes datos: si no se ve, escribe 'Pendiente'. "
-            "La descripción y las notas deben estar en español. "
-            "La categoría específica puede usar términos de moda en inglés como Hoodie, Crewneck, Loafers, Jacket, Pants, Jeans, Shirt, Bag. "
-            "La talla debe devolverse como campo propio llamado size. "
-            "Si detectas claramente más de una prenda, escribe ERROR_MULTIPLE_PRODUCTS en todos los campos. "
-            "No describas lotes. No combines múltiples marcas. "
-            "\n\nReglas editoriales para ai_description: "
-            "NO uses lenguaje comercial ni de venta. "
-            "No uses palabras como descubre, perfecto, ideal, elegante, sofisticado, guardarropa, ocasión. "
-            "Escribe en tono seco, preciso, de archivo/catálogo. "
-            "Frases cortas. Máximo 3 frases. "
-            "Describe lo visible: tipo de prenda, marca, color/material, corte, detalles, estado. "
-            "Ejemplo correcto: 'Pantalones Jean Paul Gaultier en algodón blanco. Presentan aros metálicos en los laterales y corte recto. Buen estado general.' "
-            "Ejemplo incorrecto: 'Descubre estos elegantes pantalones, perfectos para añadir un toque de sofisticación a tu guardarropa.'"
+            "Eres parte del equipo editorial de Lé Sang, una tienda de moda de diseñador y archivo en Santiago de Chile. "
+            "Tu trabajo es analizar una prenda y generar su ficha de catálogo.\n\n"
+
+            "SOBRE EL TÍTULO:\n"
+            "El título debe estar principalmente en español. "
+            "Regla: traduce al español siempre que exista un término natural equivalente. "
+            "Ejemplos de traducción: jacket → chaqueta, pants → pantalón, coat → abrigo, "
+            "shirt → camisa, skirt → falda, bag → cartera, belt → cinturón, hat → sombrero, "
+            "dress → vestido, shorts → shorts, vest → chaleco, scarf → bufanda. "
+            "Términos que QUEDAN en inglés porque son propios del lenguaje de moda sin equivalente natural: "
+            "Hoodie, Crewneck, Sweatshirt, Blazer, Trench, Bomber, Parka, Windbreaker, "
+            "Cardigan, Loafers, Sneakers, Clutch, Tote. "
+            "Formato del título: [Categoría en español/inglés según regla] [Marca]. "
+            "Ejemplo: 'Pantalón Jean Paul Gaultier', 'Hoodie Stüssy', 'Cartera Prada'.\n\n"
+
+            "SOBRE LA DESCRIPCIÓN (ai_description):\n"
+            "Escribe con la voz de alguien que conoce la historia de la moda. "
+            "No es un catálogo genérico — es una selección editorial. "
+            "La descripción tiene dos partes:\n"
+            "1. La prenda: tipo, marca, material, color, corte, detalles constructivos visibles, estado. "
+            "Podés mencionar el período o momento de la marca si es identificable y relevante. "
+            "Ej: 'Pantalón Jean Paul Gaultier de los 90, algodón blanco con aros metálicos en los laterales — "
+            "detalle característico del período más subversivo de la casa.'\n"
+            "2. Contexto de marca (brand_context): si la marca tiene historia de archivo relevante "
+            "(Jil Sander, Helmut Lang, Margiela, Gaultier, Vivienne Westwood, Raf Simons, Dries Van Noten, "
+            "Yohji Yamamoto, Issey Miyake, Comme des Garçons, Ann Demeulemeester, etc.), "
+            "escribe 1-2 frases sobre el momento o relevancia de esa pieza dentro de la historia de la marca. "
+            "Si la marca NO es de archivo relevante (Zara, H&M, marcas comerciales básicas), "
+            "deja brand_context como string vacío.\n\n"
+
+            "SOBRE LA TALLA:\n"
+            "Extrae la talla si es visible en alguna imagen. "
+            "Si no es visible o no podés determinarla, devuelve 'Pendiente'.\n\n"
+
+            "SOBRE LA CATEGORÍA:\n"
+            "Específica y simple. Puede usar términos en inglés propios del lenguaje de moda "
+            "(Hoodie, Crewneck, Blazer, Loafers, etc.) o en español según corresponda.\n\n"
+
+            "REGLAS GENERALES:\n"
+            "- No inventes datos. Si no se ve, no lo escribas.\n"
+            "- No uses lenguaje de venta ni palabras como: descubre, perfecto, ideal, elegante, "
+            "sofisticado, guardarropa, ocasión, must have.\n"
+            "- Si detectás claramente más de una prenda, escribe ERROR_MULTIPLE_PRODUCTS en todos los campos.\n"
+            "- No describas lotes ni combines múltiples marcas.\n"
+            "- Todo en español excepto los términos de moda indicados."
         ),
         input=[
             {
@@ -713,11 +674,7 @@ def analyze_folder_product_with_ai(service, folder: dict, images: list[dict]) ->
                             f"Carpeta: {folder['name']}\n"
                             "Imágenes:\n"
                             + "\n".join(image_lines)
-                            + "\n\nDevuelve JSON con: title, brand, category, size, ai_description, notes. "
-                            "brand: solo si es visible o altamente probable por etiqueta/detalle. "
-                            "category: específica y simple. "
-                            "ai_description: descripción editorial, seca y factual para Shopify. "
-                            "notes: dudas, condición, detalles visibles, talla, composición o cualquier dato relevante."
+                            + "\n\nDevuelve JSON con: title, brand, category, size, ai_description, brand_context, notes."
                         ),
                     },
                     *image_inputs,
@@ -727,26 +684,20 @@ def analyze_folder_product_with_ai(service, folder: dict, images: list[dict]) ->
         text={
             "format": {
                 "type": "json_schema",
-                "name": "catalog_item_from_folder_editorial",
+                "name": "catalog_item_from_folder_editorial_v2",
                 "strict": True,
                 "schema": {
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string"},
-                        "brand": {"type": "string"},
-                        "category": {"type": "string"},
-                        "size": {"type": "string"},
-                        "ai_description": {"type": "string"},
-                        "notes": {"type": "string"},
+                        "title":         {"type": "string"},
+                        "brand":         {"type": "string"},
+                        "category":      {"type": "string"},
+                        "size":          {"type": "string"},
+                        "ai_description":{"type": "string"},
+                        "brand_context": {"type": "string"},
+                        "notes":         {"type": "string"},
                     },
-                    "required": [
-                        "title",
-                        "brand",
-                        "category",
-                        "size",
-                        "ai_description",
-                        "notes",
-                    ],
+                    "required": ["title", "brand", "category", "size", "ai_description", "brand_context", "notes"],
                     "additionalProperties": False,
                 },
             }
@@ -760,20 +711,30 @@ def analyze_folder_product_with_ai(service, folder: dict, images: list[dict]) ->
         raise RuntimeError("La IA detectó múltiples productos dentro de la carpeta.")
 
     category = (data.get("category") or "Accessory").strip() or "Accessory"
-    brand = (data.get("brand") or "Pendiente").strip() or "Pendiente"
-    size = (data.get("size") or "Pendiente").strip() or "Pendiente"
+    brand     = (data.get("brand") or "Pendiente").strip() or "Pendiente"
+    size      = (data.get("size") or "Pendiente").strip() or "Pendiente"
 
-    data["title"] = f"{category} {brand}".strip()
-    data["brand"] = brand
+    # Título ya viene formateado desde el prompt
+    data["title"]    = (data.get("title") or f"{category} {brand}").strip()
+    data["brand"]    = brand
     data["category"] = category
-    data["size"] = size
+    data["size"]     = size
     data["shopify_category"] = map_shopify_category(category)
 
-    description = clean_editorial_text((data.get("ai_description") or "").strip())
-    notes = clean_notes_text((data.get("notes") or "").strip())
+    # ── Construir descripción final ───────────────────────────────────────────
+    description   = clean_editorial_text((data.get("ai_description") or "").strip())
+    brand_context = (data.get("brand_context") or "").strip()
+    notes         = clean_notes_text((data.get("notes") or "").strip())
+    size_line     = build_size_line(size)
 
-    data["ai_description"] = f"{description}\n\n{LE_SANG_TEXT}"
-    data["notes"] = notes
+    # Estructura: descripción + talla + contexto de marca (si hay) + texto Lé Sang
+    parts = [description, size_line]
+    if brand_context:
+        parts.append(brand_context)
+    parts.append(LE_SANG_TEXT)
+
+    data["ai_description"] = "\n\n".join(parts)
+    data["notes"]          = notes
 
     print("Resultado análisis producto:")
     print(json.dumps(data, indent=2, ensure_ascii=False))
@@ -791,24 +752,20 @@ def build_item_payload(folder: dict, images: list[dict], ai_result: dict) -> dic
 
     notes = ai_result["notes"]
     folder_note = f"Carpeta Drive origen: {folder['name']} ({folder['id']})"
-
-    if notes:
-        notes = f"{notes}\n\n{folder_note}"
-    else:
-        notes = folder_note
+    notes = f"{notes}\n\n{folder_note}" if notes else folder_note
 
     return {
-        "title": ai_result["title"],
-        "brand": ai_result["brand"],
-        "category": ai_result["category"],
-        "size": ai_result["size"],
-        "status": "ready_for_review",
-        "drive_folder_id": folder["id"],
-        "ai_description": ai_result["ai_description"],
-        "notes": notes,
-        "shopify_status": "draft",
+        "title":            ai_result["title"],
+        "brand":            ai_result["brand"],
+        "category":         ai_result["category"],
+        "size":             ai_result["size"],
+        "status":           "ready_for_review",
+        "drive_folder_id":  folder["id"],
+        "ai_description":   ai_result["ai_description"],
+        "notes":            notes,
+        "shopify_status":   "draft",
         "shopify_category": ai_result["shopify_category"],
-        "image_urls": image_data,
+        "image_urls":       image_data,
     }
 
 
@@ -820,19 +777,16 @@ def save_item_to_supabase(folder: dict, images: list[dict], ai_result: dict):
     if existing_item:
         print(f"Item existente detectado: {existing_item['id']}")
         print("Actualizando item en Supabase...\n")
-
         response = (
             supabase.table("items")
             .update(payload)
             .eq("id", existing_item["id"])
             .execute()
         )
-
         return "updated", response.data
 
     print("No existe item previo para esta carpeta.")
     print("Creando item nuevo en Supabase...\n")
-
     response = supabase.table("items").insert(payload).execute()
     return "created", response.data
 
@@ -840,9 +794,7 @@ def save_item_to_supabase(folder: dict, images: list[dict], ai_result: dict):
 def mark_folder_for_manual_review(folder: dict, images: list[dict], reason: str, confidence=None):
     image_ids = [img["id"] for img in images]
     signature = build_product_folder_signature(folder, images)
-
     print("Marcando carpeta para revisión manual...\n")
-
     upsert_cache_record(
         group_signature=signature,
         status="manual_review_required",
@@ -880,11 +832,9 @@ def process_product_folder(service, folder: dict):
     if cache_record:
         cache_status = cache_record.get("status")
         print(f"Cache encontrado para carpeta: {cache_status}\n")
-
         if cache_status == "processed":
             print("Esta carpeta ya fue procesada antes. Se omite.\n")
             return
-
         if cache_status == "manual_review_required":
             print("Esta carpeta ya está marcada para revisión manual. Se omite.\n")
             return
@@ -894,7 +844,6 @@ def process_product_folder(service, folder: dict):
     if existing_item and item_is_complete(existing_item):
         print(f"Item completo ya existente: {existing_item['id']}")
         print("Se marca como processed en cache y se omite IA.\n")
-
         upsert_cache_record(
             group_signature=signature,
             status="processed",
@@ -929,8 +878,7 @@ def process_product_folder(service, folder: dict):
         ai_result = analyze_folder_product_with_ai(service, folder, images)
     except Exception as e:
         mark_folder_for_manual_review(
-            folder,
-            images,
+            folder, images,
             reason=f"Análisis final falló o detectó múltiples productos: {e}",
             confidence=confidence,
         )
