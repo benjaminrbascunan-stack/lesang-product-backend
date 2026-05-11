@@ -150,7 +150,10 @@ async def get_shopify_token() -> str:
 MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
          "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
 
-POS_CONFIG = {
+# ── Config persistence ───────────────────────────────────────────────────────
+CONFIG_FILE = BASE_DIR / "pos_config.json"
+
+DEFAULT_CONFIG = {
     "vendedores": ["Aaron", "Benja R", "Fabio", "Marenna", "Michelle"],
     "propietarios": ["Tienda", "Aaron", "Benja R", "Fabio", "Consignacion"],
     "marcas": [
@@ -168,6 +171,27 @@ POS_CONFIG = {
     },
     "iva_tipos": ["Débito", "Crédito"],
 }
+
+def load_config() -> dict:
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                saved = json.load(f)
+                # Merge with defaults to ensure all keys exist
+                merged = {**DEFAULT_CONFIG, **saved}
+                return merged
+        except Exception:
+            pass
+    return dict(DEFAULT_CONFIG)
+
+def save_config(cfg: dict):
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[Config] Error guardando: {e}")
+
+POS_CONFIG = load_config()
 
 
 # ── POS Models ────────────────────────────────────────────────────────────────
@@ -189,6 +213,7 @@ class VentaIn(BaseModel):
     observaciones:     Optional[str]   = ""
     marca:             str
     order_name:        Optional[str]   = ""
+    foto_link:         Optional[str]   = None
     shopify_id:        Optional[str]   = None
     shopify_variant:   Optional[str]   = None
 
@@ -270,6 +295,7 @@ def update_pos_config(body: ConfigUpdate):
     if body.marcas              is not None: POS_CONFIG["marcas"]              = body.marcas
     if body.vendedores_externos is not None: POS_CONFIG["vendedores_externos"] = body.vendedores_externos
     if body.com_externo_pct     is not None: POS_CONFIG["com_externo_pct"]     = body.com_externo_pct
+    save_config(POS_CONFIG)  # persistir en disco
     return POS_CONFIG
 
 @app.get("/pos/products")
@@ -426,6 +452,71 @@ def pos_sheet_url():
         return {"url": f"https://docs.google.com/spreadsheets/d/{sid}"}
     except Exception as e:
         return {"url": None, "error": str(e)}
+
+# ── Subir foto de venta ──────────────────────────────────────────────────────
+from fastapi import UploadFile, File, Form as FastForm
+import base64, io
+
+@app.post("/pos/foto")
+async def subir_foto(
+    foto: UploadFile = File(...),
+    nombre_prenda: str = FastForm(""),
+    precio: str = FastForm(""),
+    vendedor: str = FastForm(""),
+):
+    from datetime import datetime as dt
+    try:
+        from pos_sheets import get_creds
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseUpload
+
+        creds  = get_creds()
+        drive  = build("drive", "v3", credentials=creds)
+
+        # Crear carpeta "Fotos POS" si no existe
+        q = "name='Fotos POS — Lé Sang' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        res = drive.files().list(q=q, fields="files(id)").execute()
+        folders = res.get("files", [])
+        if folders:
+            folder_id = folders[0]["id"]
+        else:
+            folder = drive.files().create(
+                body={"name": "Fotos POS — Lé Sang", "mimeType": "application/vnd.google-apps.folder"},
+                fields="id"
+            ).execute()
+            folder_id = folder["id"]
+
+        # Nombre del archivo: fecha_hora_prenda_precio
+        ts = dt.now().strftime("%Y%m%d_%H%M%S")
+        prenda_safe = nombre_prenda.replace(" ", "_")[:30] if nombre_prenda else "sin_nombre"
+        filename = f"{ts}_{prenda_safe}_{precio}CLP.jpg"
+
+        # Subir foto a Drive
+        content_bytes = await foto.read()
+        media = MediaIoBaseUpload(
+            io.BytesIO(content_bytes),
+            mimetype=foto.content_type or "image/jpeg",
+            resumable=False
+        )
+        file_meta = {"name": filename, "parents": [folder_id]}
+        uploaded = drive.files().create(
+            body=file_meta, media_body=media, fields="id,webViewLink"
+        ).execute()
+
+        # Hacer pública la foto
+        drive.permissions().create(
+            fileId=uploaded["id"],
+            body={"type": "anyone", "role": "reader"}
+        ).execute()
+
+        link = uploaded.get("webViewLink", "")
+        print(f"[Foto] Subida: {filename} -> {link}")
+        return {"success": True, "filename": filename, "link": link, "file_id": uploaded["id"]}
+
+    except Exception as e:
+        print(f"[Foto] Error: {e}")
+        return {"success": False, "error": str(e)}
+
 
 # ── Servir el POS frontend ────────────────────────────────────────────────────
 app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")

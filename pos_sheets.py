@@ -38,11 +38,10 @@ HEADERS = [
     "Fecha",                   # P
     "Hora",                    # Q
     "Orden Shopify",           # R
-    "Valor de compra",         # S
-    "Margen real",             # T
+    "Foto (link)",             # S
 ]
 
-N_COLS = len(HEADERS)  # 20
+N_COLS = len(HEADERS)  # 19
 
 # Colores
 C_BLACK  = {"red": 0.0,  "green": 0.0,  "blue": 0.0}
@@ -142,7 +141,7 @@ def _format_sheet_requests(gid: int, mes: str) -> list:
     }})
 
     # Anchos de columnas A-T
-    widths = [180,55,120,90,120,110,85,100,100,120,100,100,110,180,110,90,70,110,110,90]
+    widths = [180,55,120,90,120,110,85,100,100,120,100,100,110,180,110,90,70,110,200]
     for ci, w in enumerate(widths[:N_COLS]):
         reqs.append({"updateDimensionProperties": {
             "range": {"sheetId": gid, "dimension": "COLUMNS", "startIndex": ci, "endIndex": ci+1},
@@ -375,9 +374,6 @@ def _build_row(venta: dict) -> list:
         try: return float(val or 0)
         except: return 0.0
 
-    vc     = venta.get("valor_compra")
-    margen = venta.get("margen")
-
     return [
         str(venta.get("nombre_prenda") or ""),   # A
         str(venta.get("talla") or "—"),           # B
@@ -397,8 +393,7 @@ def _build_row(venta: dict) -> list:
         fecha,                                    # P
         hora,                                     # Q
         str(venta.get("order_name") or ""),       # R
-        float(vc) if vc else "",                  # S
-        float(margen) if margen else "",          # T
+        str(venta.get("foto_link") or ""),        # S
     ]
 
 
@@ -543,8 +538,7 @@ def get_ventas_mes(mes: str) -> list:
                 "fecha":              str(row[15]),
                 "hora":               str(row[16]),
                 "order_name":         str(row[17]) if len(row) > 17 else "",
-                "valor_compra":       f(row[18]) if len(row) > 18 and row[18] != "" else None,
-                "margen":             f(row[19]) if len(row) > 19 and row[19] != "" else None,
+                "foto_link":          str(row[18]) if len(row) > 18 else "",
             })
         except Exception as e:
             print(f"[Sheets] fila {i+3} error: {e}")
