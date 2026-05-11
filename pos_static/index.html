@@ -1477,6 +1477,71 @@ function renderResumenes(d,mes){
     </div>
   </div>`;
 
+  // Por marca
+  const marcas={};
+  v.forEach(x=>{
+    const m=x.marca||'Tienda';
+    if(!marcas[m]) marcas[m]={ventas:0,bruto:0,comision_tienda:0};
+    marcas[m].ventas++;
+    marcas[m].bruto+=x.precio_bruto;
+    const esExt=!['Tienda',''].includes(m);
+    marcas[m].comision_tienda+=esExt?x.precio_bruto*0.25:x.neto_tienda;
+  });
+  const marcasCard=`<div class="res-card">
+    <div class="res-card-title">Por marca</div>
+    ${Object.entries(marcas).sort((a,b)=>b[1].bruto-a[1].bruto).map(([nombre,md])=>`
+      <div class="res-marca-row">
+        <div class="res-marca-name">${esc(nombre)}</div>
+        <div class="res-marca-stats">
+          <div class="res-marca-stat"><strong>${md.ventas}</strong>ventas</div>
+          <div class="res-marca-stat"><strong>$${fmt(md.bruto)}</strong>bruto</div>
+          <div class="res-marca-stat oran"><strong>$${fmt(Math.round(md.comision_tienda))}</strong>${nombre==='Tienda'?'neto':'com. tienda'}</div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+
+  // Comisiones vendedoras — solo Tienda y Consignación
+  const extVend=CFG.vendedores_externos||[];
+  const marcasExternas=new Set((CFG.marcas||[]).filter(m=>m.comision>0&&m.nombre!=='Consignacion').map(m=>m.nombre));
+  const vendComReal={};
+  v.forEach(x=>{
+    if(!extVend.includes(x.vendedor)) return;
+    if(marcasExternas.has(x.marca||'')) return;
+    if(!vendComReal[x.vendedor]) vendComReal[x.vendedor]={ventas:0,bruto:0,comision:0};
+    vendComReal[x.vendedor].ventas++;
+    vendComReal[x.vendedor].bruto+=x.precio_bruto;
+    vendComReal[x.vendedor].comision+=x.precio_bruto*(CFG.com_externo_pct||0.05);
+  });
+  const vendCom=Object.entries(vendComReal);
+  const vendCard=`<div class="res-card">
+    <div class="res-card-title">Comisiones vendedoras</div>
+    ${vendCom.length?vendCom.sort((a,b)=>b[1].comision-a[1].comision).map(([name,dd])=>`
+      <div class="res-vend-row">
+        <div>
+          <div class="res-vend-name">${esc(name)}</div>
+          <div style="font-size:9px;color:var(--gray4)">${dd.ventas} ventas tienda · $${fmt(dd.bruto)} bruto</div>
+        </div>
+        <div class="res-vend-com">$${fmt(Math.round(dd.comision))}</div>
+      </div>`).join('')
+    :`<div class="res-empty">Sin comisiones este mes</div>`}
+  </div>`;
+
+  // Top productos
+  const byProd={};
+  v.forEach(x=>{
+    if(!byProd[x.nombre_prenda]) byProd[x.nombre_prenda]={ventas:0,bruto:0};
+    byProd[x.nombre_prenda].ventas++;
+    byProd[x.nombre_prenda].bruto+=x.precio_bruto;
+  });
+  const topCard=`<div class="res-card">
+    <div class="res-card-title">Top productos</div>
+    ${Object.entries(byProd).sort((a,b)=>b[1].bruto-a[1].bruto).slice(0,8).map(([nombre,pd])=>`
+      <div class="res-stat">
+        <span class="res-stat-label" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nombre)}</span>
+        <span class="res-stat-val orange">$${fmt(pd.bruto)}</span>
+      </div>`).join('')}
+  </div>`;
+
   grid.innerHTML=tiendaCard+marcasCard+vendCard+topCard;
 }
 
