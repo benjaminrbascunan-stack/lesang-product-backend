@@ -544,27 +544,139 @@ nav{
 
 /* ══ MOBILE ══ */
 @media(max-width:768px){
-  nav{overflow-x:auto}
+  /* Nav — fixed, scroll horizontal */
+  nav{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
   nav::-webkit-scrollbar{display:none}
-  .nav-logo{padding:0 12px;flex-shrink:0}
+  .nav-logo{padding:0 12px;flex-shrink:0;min-width:fit-content}
   .nav-gallery{display:none}
-  .ntab{padding:0 10px;font-size:9px;white-space:nowrap}
+  .ntabs{flex-shrink:0}
+  .ntab{padding:0 14px;font-size:10px;white-space:nowrap;flex-shrink:0;min-width:fit-content}
   .ntab svg{display:none}
   .nav-right{display:none}
-  #page-pos{flex-direction:column!important}
-  .pos-left{height:auto;flex:none;border-right:none;border-bottom:1px solid var(--gray2)}
-  .grid-wrap{padding:8px;max-height:36vh}
-  .pgrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:5px}
-  .cart-panel{width:100%!important;border-left:none}
-  .cp-form{padding:8px 10px;gap:6px}
+
+  /* POS — catálogo a pantalla completa, formulario como bottom sheet */
+  #page-pos{flex-direction:column!important;position:relative}
+  .pos-left{
+    flex:1;height:100%;border-right:none;
+    overflow:hidden;display:flex;flex-direction:column;
+  }
+  .pos-toolbar{height:44px}
+  .pos-toolbar .pos-count{display:none}
+  .grid-wrap{
+    flex:1;padding:8px;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .pgrid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .pctitle{font-size:9px}
+  .pcprice{font-size:13px}
+
+  /* Bottom sheet — formulario de venta */
+  .cart-panel{
+    position:fixed!important;
+    bottom:0;left:0;right:0;
+    width:100%!important;
+    height:auto;
+    max-height:92vh;
+    border-left:none!important;
+    border-top:1px solid var(--gray2);
+    border-radius:16px 16px 0 0;
+    box-shadow:0 -4px 24px rgba(0,0,0,.12);
+    transform:translateY(100%);
+    transition:transform .35s cubic-bezier(.32,.72,0,1);
+    z-index:150;
+    display:flex!important;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .cart-panel.sheet-open{transform:translateY(0)!important}
+
+  /* Handle drag indicator */
+  .cart-panel::before{
+    content:'';
+    display:block;
+    width:36px;height:4px;
+    background:var(--gray3);border-radius:2px;
+    margin:10px auto 0;
+    flex-shrink:0;
+  }
+
+  .cp-header{
+    padding:6px 16px 10px;
+    border-bottom:1px solid var(--gray2);
+  }
+  .cp-title{font-size:12px}
+
+  /* Scroll interno del formulario */
+  .cp-form{
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    max-height:50vh;
+    padding:10px 14px;
+    gap:8px;
+  }
+  .calc-block{margin:0 14px}
+  .cp-footer{padding:10px 14px 20px}
+
+  /* Backdrop cuando el sheet está abierto */
+  .sheet-backdrop{
+    display:none;
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.3);
+    z-index:149;
+  }
+  .sheet-backdrop.show{display:block}
+
+  /* Botón flotante para abrir el sheet si nada seleccionado */
+  .sheet-fab{
+    display:flex;
+    position:fixed;bottom:16px;right:16px;
+    width:52px;height:52px;border-radius:50%;
+    background:var(--black);color:#fff;
+    align-items:center;justify-content:center;
+    font-size:24px;font-weight:300;
+    box-shadow:0 4px 16px rgba(0,0,0,.25);
+    cursor:pointer;z-index:148;
+    transition:transform .15s,background .15s;
+    border:none;font-family:var(--font);
+  }
+  .sheet-fab:active{transform:scale(.93)}
+  .sheet-fab.hidden{display:none}
+
+  /* Historial */
   .hist-body{flex-direction:column}
-  .hist-right{width:100%;border-left:none;border-top:1px solid var(--gray2)}
-  .hist-left{overflow-x:auto}
+  .hist-right{
+    width:100%;border-left:none;
+    border-top:1px solid var(--gray2);
+    max-height:260px;overflow-y:auto;
+  }
+  .hist-left{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .hist-toolbar{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .hist-toolbar::-webkit-scrollbar{display:none}
+
+  /* Resumenes */
   .res-grid{grid-template-columns:1fr}
+  .res-header{position:sticky;top:0;z-index:10;background:var(--white)}
+
+  /* Config */
   .config-grid{grid-template-columns:1fr}
-  .ops-body{grid-template-columns:1fr}
-  .ops-left{border-right:none;border-bottom:1px solid var(--gray2);max-height:200px}
-  .modal{width:95vw}
+
+  /* Operaciones */
+  .ops-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .ops-left{
+    border-right:none;border-bottom:1px solid var(--gray2);
+    overflow-y:auto;max-height:220px;
+  }
+  .ops-btn{min-height:56px;padding:0 20px}
+  .ops-label{font-size:18px}
+
+  /* Modal */
+  .modal{width:96vw;max-height:88vh;overflow-y:auto}
+  .m-header{padding:16px 18px}
+  .m-body{padding:14px 18px}
+  .m-footer{padding:12px 18px 20px}
+
+  /* Foto */
+  .foto-section{padding:0 14px 6px}
 }
 /* Foto */
 .foto-section{padding:0 14px 8px;flex-shrink:0}
@@ -667,7 +779,7 @@ nav{
       </button>
     </div>
 
-    <div class="cp-form">
+    <div class="cp-form" id="cp-form">
       <div class="fgrp">
         <label class="flabel" for="f-precio">Precio venta bruto (CLP) *</label>
         <div class="price-wrap">
@@ -749,6 +861,11 @@ nav{
     </div>
   </div>
 </div>
+
+<!-- Sheet backdrop (mobile) -->
+<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()"></div>
+<!-- FAB para abrir sheet en mobile -->
+<button class="sheet-fab" id="sheet-fab" onclick="openSheet()">+</button>
 
 <!-- PAGE: HISTORIAL -->
 <div class="page" id="page-hist">
@@ -982,7 +1099,7 @@ function renderGrid(){
     const sc=p.stock<=0?'sb-no':p.stock<=2?'sb-low':'sb-ok';
     const sl=p.stock<=0?'Sin stock':p.stock<=2?`${p.stock} left`:`${p.stock}`;
     const img=p.image?`<img src="${p.image}" loading="lazy">`:`<div class="nimg"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>`;
-    return `<div class="pcard${p.stock<=0?' sold':''}${isSel?' sel':''}" onclick="selectProd('${p.id}')">
+    return `<div class="pcard${p.stock<=0?' sold':''}${isSel?' sel':''}" onclick="isMobile()?selectProdMobile('${p.id}'):selectProd('${p.id}')">
       <div class="pcimg">${img}
         <div class="sbadge ${sc}">${sl}</div>
         <div class="sel-mark"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -1121,6 +1238,7 @@ async function registrarVenta(){
     mostrarModalOk({...payload,order_name:result.order_name});
     resetForm();renderGrid();
     loadHistorial(MES);
+    if(isMobile()) closeSheet();
   }catch(e){
     toast(e.message||'Error al registrar','err');
     btn.disabled=false;
@@ -1700,6 +1818,67 @@ function resetFoto() {
 }
 
 init();
+
+
+// ── BOTTOM SHEET (mobile) ──────────────────────────────────────────────────────
+const isMobile = () => window.innerWidth <= 768;
+
+function openSheet() {
+  if (!isMobile()) return;
+  document.getElementById('cart-panel') && document.querySelector('.cart-panel')?.classList.add('sheet-open');
+  document.getElementById('sheet-backdrop')?.classList.add('show');
+  document.getElementById('sheet-fab')?.classList.add('hidden');
+  // Scroll formulario al top
+  setTimeout(() => {
+    document.getElementById('cp-form')?.scrollTo(0, 0);
+  }, 50);
+}
+
+function closeSheet() {
+  if (!isMobile()) return;
+  document.querySelector('.cart-panel')?.classList.remove('sheet-open');
+  document.getElementById('sheet-backdrop')?.classList.remove('show');
+  document.getElementById('sheet-fab')?.classList.remove('hidden');
+}
+
+// Al seleccionar producto en mobile — abrir sheet automáticamente
+const _origSelectProd = selectProd;
+
+// Override selectProd para mobile
+function selectProdMobile(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p || !p.available) return;
+  selectProd(id);
+  if (isMobile()) openSheet();
+}
+
+// Touch swipe down para cerrar sheet
+let touchStartY = 0;
+document.addEventListener('touchstart', e => {
+  touchStartY = e.touches[0].clientY;
+}, {passive: true});
+
+document.addEventListener('touchend', e => {
+  if (!isMobile()) return;
+  const panel = document.querySelector('.cart-panel');
+  if (!panel?.classList.contains('sheet-open')) return;
+  const diff = e.changedTouches[0].clientY - touchStartY;
+  if (diff > 80) closeSheet(); // swipe down > 80px cierra el sheet
+}, {passive: true});
+
+// Cerrar sheet con ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSheet();
+});
+
+// Ajustar FAB cuando hay venta registrada
+function updateFAB() {
+  const fab = document.getElementById('sheet-fab');
+  if (!fab) return;
+  fab.style.background = document.getElementById('sell-btn')?.disabled === false
+    ? 'var(--orange)' : 'var(--black)';
+}
+
 
 // ── AUTO-REFRESH CATÁLOGO ────────────────────────────────────────────────────
 // Recarga solo los productos en segundo plano cada 5 minutos
