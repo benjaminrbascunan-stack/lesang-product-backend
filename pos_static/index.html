@@ -91,6 +91,7 @@ nav{
 
 /* ── PAGES ── */
 .page{position:fixed;top:var(--nav);left:0;right:0;bottom:0;display:none;overflow:hidden;background:var(--white)}
+@media(max-width:768px){.page{overflow:visible}}
 .page.active{display:flex}
 
 /* ══════════════════════
@@ -164,7 +165,7 @@ nav{
 
 /* ── CART PANEL ── */
 .cart-panel{
-  width:var(--cart);display:flex;flex-direction:column;overflow:hidden;
+  width:var(--cart);display:flex;flex-direction:column;overflow:visible;
   background:var(--white);border-left:1px solid var(--gray2);
 }
 .cp-header{
