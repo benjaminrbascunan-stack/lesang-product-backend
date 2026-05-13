@@ -25,7 +25,7 @@
   --transition:all .15s ease;
 }
 html,body{height:100%;background:var(--white);color:var(--text);font-family:var(--font);overflow:hidden;font-size:12px}
-@media(max-width:768px){html,body{overflow:hidden;position:fixed;width:100%;height:100%}}
+
 
 /* ── LOADING SCREEN ── */
 #loading{
@@ -722,10 +722,7 @@ nav{
   .foto-section{padding:0 14px 6px}
 }
 
-/* Foto */
-  .foto-section{padding:0 14px 6px}
-}
-/* Foto */
+/* Foto — global */
 .foto-section{padding:0 14px 8px;flex-shrink:0}
 .foto-btn{
   width:100%;padding:9px;background:var(--gray1);
@@ -1146,7 +1143,7 @@ function renderGrid(){
     const sc=p.stock<=0?'sb-no':p.stock<=2?'sb-low':'sb-ok';
     const sl=p.stock<=0?'Sin stock':p.stock<=2?`${p.stock} left`:`${p.stock}`;
     const img=p.image?`<img src="${p.image}" loading="lazy">`:`<div class="nimg"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>`;
-    return `<div class="pcard${p.stock<=0?' sold':''}${isSel?' sel':''}" onclick="isMobile()?selectProdMobile('${p.id}'):selectProd('${p.id}')">
+    return `<div class="pcard${p.stock<=0?' sold':''}${isSel?' sel':''}" onclick="selectProdMobile('${p.id}')">
       <div class="pcimg">${img}
         <div class="sbadge ${sc}">${sl}</div>
         <div class="sel-mark"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
@@ -1817,6 +1814,38 @@ function toast(msg,type=''){
   tt=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
+// ── BOTTOM SHEET (mobile) ────────────────────────────────────────────────────
+function isMobile() { return window.innerWidth <= 768; }
+
+function openSheet() {
+  document.querySelector('.cart-panel').classList.add('sheet-open');
+  document.getElementById('sheet-backdrop').classList.add('show');
+  document.getElementById('sheet-fab').classList.add('hidden');
+}
+
+function closeSheet() {
+  document.querySelector('.cart-panel').classList.remove('sheet-open');
+  document.getElementById('sheet-backdrop').classList.remove('show');
+  document.getElementById('sheet-fab').classList.remove('hidden');
+}
+
+function selectProdMobile(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p || !p.available) return;
+  selectProd(id);
+  if (isMobile()) openSheet();
+}
+
+// Swipe down para cerrar
+let _touchY = 0;
+document.addEventListener('touchstart', e => { _touchY = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchend', e => {
+  if (!isMobile()) return;
+  if (!document.querySelector('.cart-panel').classList.contains('sheet-open')) return;
+  if (e.changedTouches[0].clientY - _touchY > 80) closeSheet();
+}, {passive:true});
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeSheet(); });
+
 // ── FOTO ──────────────────────────────────────────────────────────────────────
 let fotoFile = null;
 
@@ -1866,94 +1895,18 @@ function resetFoto() {
 
 init();
 
-
-// ── BOTTOM SHEET (mobile) ──────────────────────────────────────────────────────
-const isMobile = () => window.innerWidth <= 768;
-
-function openSheet() {
-  if (!isMobile()) return;
-  document.getElementById('cart-panel') && document.querySelector('.cart-panel')?.classList.add('sheet-open');
-  document.getElementById('sheet-backdrop')?.classList.add('show');
-  document.getElementById('sheet-fab')?.classList.add('hidden');
-  // Scroll formulario al top
-  setTimeout(() => {
-    document.getElementById('cp-form')?.scrollTo(0, 0);
-  }, 50);
-}
-
-function closeSheet() {
-  if (!isMobile()) return;
-  document.querySelector('.cart-panel')?.classList.remove('sheet-open');
-  document.getElementById('sheet-backdrop')?.classList.remove('show');
-  document.getElementById('sheet-fab')?.classList.remove('hidden');
-}
-
-// Al seleccionar producto en mobile — abrir sheet automáticamente
-const _origSelectProd = selectProd;
-
-// Override selectProd para mobile
-function selectProdMobile(id) {
-  const p = allProducts.find(x => x.id === id);
-  if (!p || !p.available) return;
-  selectProd(id);
-  if (isMobile()) openSheet();
-}
-
-// Touch swipe down para cerrar sheet
-let touchStartY = 0;
-document.addEventListener('touchstart', e => {
-  touchStartY = e.touches[0].clientY;
-}, {passive: true});
-
-document.addEventListener('touchend', e => {
-  if (!isMobile()) return;
-  const panel = document.querySelector('.cart-panel');
-  if (!panel?.classList.contains('sheet-open')) return;
-  const diff = e.changedTouches[0].clientY - touchStartY;
-  if (diff > 80) closeSheet(); // swipe down > 80px cierra el sheet
-}, {passive: true});
-
-// Cerrar sheet con ESC
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeSheet();
-});
-
-// Ajustar FAB cuando hay venta registrada
-function updateFAB() {
-  const fab = document.getElementById('sheet-fab');
-  if (!fab) return;
-  fab.style.background = document.getElementById('sell-btn')?.disabled === false
-    ? 'var(--orange)' : 'var(--black)';
-}
-
-
 // ── AUTO-REFRESH CATÁLOGO ────────────────────────────────────────────────────
-// Recarga solo los productos en segundo plano cada 5 minutos
-// No interrumpe al usuario, no recarga la página
 setInterval(async () => {
-  // No refrescar si hay un producto seleccionado o una venta en curso
   if (selectedProd) return;
-  if (document.getElementById('sell-btn').textContent.includes('PROCESANDO')) return;
-
   try {
     const r = await fetch(`${API}/pos/products`);
     if (!r.ok) return;
     const d = await r.json();
-
-    // Actualizar solo si cambió algo
-    const prevCount = allProducts.length;
-    const prevStocks = allProducts.map(p => p.stock).join(',');
+    const prev = allProducts.map(p=>p.stock).join(',');
     allProducts = d.products;
-    const newStocks = allProducts.map(p => p.stock).join(',');
-
-    if (prevCount !== allProducts.length || prevStocks !== newStocks) {
-      renderGrid();
-      console.log('[POS] Catálogo actualizado silenciosamente');
-    }
-  } catch {
-    // Silencioso — no mostrar error si falla el refresh
-  }
-}, 5 * 60 * 1000); // cada 5 minutos
+    if (prev !== allProducts.map(p=>p.stock).join(',')) renderGrid();
+  } catch {}
+}, 5 * 60 * 1000);
 
 </script>
 </body>
