@@ -608,13 +608,13 @@ nav{
     right:0!important;
     top:auto!important;
     width:100%!important;
-    max-height:88vh;
+    max-height:90vh;
     border-left:none!important;
-    border-radius:14px 14px 0 0;
-    box-shadow:0 -8px 32px rgba(0,0,0,.18);
+    border-radius:16px 16px 0 0;
+    box-shadow:0 -8px 32px rgba(0,0,0,.2);
     transform:translateY(110%)!important;
     transition:transform .3s cubic-bezier(.32,.72,0,1)!important;
-    z-index:300!important;
+    z-index:400!important;
     background:var(--white)!important;
     display:flex!important;
     flex-direction:column;
@@ -632,16 +632,30 @@ nav{
     margin:10px auto 2px;
     flex-shrink:0;
   }
+  .cp-header{padding:8px 16px 10px;flex-shrink:0}
+  .cp-title{font-size:13px}
   .cp-form{
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
     flex:1;
-    padding:10px 14px;
-    gap:8px;
+    padding:12px 14px;
+    gap:10px;
   }
+  .finput,.fsel{font-size:14px;padding:10px 10px}
+  .flabel{font-size:10px}
+  .frow{gap:8px}
   .calc-block{margin:4px 14px 0}
-  .cp-footer{padding:10px 14px 28px;flex-shrink:0}
-  .sel-strip{flex-shrink:0}
+  .calc-inner{padding:10px 12px}
+  .clabel{font-size:10px}
+  .cval{font-size:12px}
+  .ctlabel{font-size:11px}
+  .ctval{font-size:22px}
+  .cp-footer{padding:12px 14px 32px;flex-shrink:0}
+  .sell-btn{font-size:13px;padding:14px}
+  .clear-btn{font-size:11px;padding:9px}
+  .sel-strip{flex-shrink:0;padding:10px 14px}
+  .sel-name{font-size:12px}
+  .foto-section{padding:0 14px 8px;flex-shrink:0}
 
   /* Backdrop */
   .sheet-backdrop{
@@ -650,8 +664,6 @@ nav{
     inset:0;
     background:rgba(0,0,0,.35);
     z-index:299;
-    backdrop-filter:blur(2px);
-    -webkit-backdrop-filter:blur(2px);
   }
   .sheet-backdrop.show{display:block}
 
@@ -660,20 +672,18 @@ nav{
     display:flex;
     position:fixed;
     bottom:20px;right:16px;
-    width:52px;height:52px;
+    width:56px;height:56px;
     border-radius:50%;
     background:var(--black);
     color:var(--white);
     align-items:center;justify-content:center;
-    font-size:26px;line-height:1;
+    font-size:28px;line-height:1;
     box-shadow:0 4px 20px rgba(0,0,0,.3);
     cursor:pointer;
     z-index:298;
     border:none;
     font-family:var(--font);
-    transition:transform .15s,background .15s;
   }
-  .sheet-fab:active{transform:scale(.9)}
   .sheet-fab.hidden{display:none!important}
 
   /* Historial */
