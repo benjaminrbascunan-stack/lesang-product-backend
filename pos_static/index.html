@@ -545,191 +545,101 @@ nav{
 
 /* ══ MOBILE ══ */
 @media(max-width:768px){
-  /* Nav — barra fija con scroll horizontal */
-  nav{
-    overflow-x:auto;overflow-y:hidden;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
-  }
+  /* Nav */
+  nav{overflow-x:auto;scrollbar-width:none}
   nav::-webkit-scrollbar{display:none}
   .nav-logo{padding:0 12px;flex-shrink:0}
   .nav-gallery{display:none}
-  .ntabs{flex-shrink:0;display:flex}
-  .ntab{
-    padding:0 14px;font-size:10px;
-    white-space:nowrap;flex-shrink:0;
-    letter-spacing:.1em;
-  }
+  .ntab{padding:0 14px;font-size:10px;white-space:nowrap;flex-shrink:0;letter-spacing:.1em}
   .ntab svg{display:none}
   .nav-right{display:none}
 
-  /* POS page — solo el catálogo, full height */
-  #page-pos{
-    flex-direction:column!important;
-    top:var(--nav);bottom:0;left:0;right:0;
-    overflow:hidden;
-  }
-  .pos-left{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    overflow:hidden;
-    border-right:none;
-    height:100%;
-  }
-  .pos-toolbar{
-    flex-shrink:0;
-    height:44px;
-    overflow-x:auto;
-    scrollbar-width:none;
-  }
+  /* POS — vista catálogo */
+  #page-pos{flex-direction:column!important}
+  .pos-left{flex:1;border-right:none;display:flex;flex-direction:column;overflow:hidden}
+  .pos-toolbar{flex-shrink:0;overflow-x:auto;scrollbar-width:none}
   .pos-toolbar::-webkit-scrollbar{display:none}
   .pos-count{display:none}
-  .grid-wrap{
-    flex:1;
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
-    padding:8px;
-    background:var(--gray1);
-  }
-  .pgrid{
-    grid-template-columns:repeat(3,1fr);
-    gap:6px;
-  }
+  .grid-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px}
+  .pgrid{grid-template-columns:repeat(3,1fr);gap:6px}
   .pctitle{font-size:9px}
-  .pcprice{font-size:13px}
+  .pcprice{font-size:12px}
   .pcprice small{font-size:8px}
 
-  /* Cart panel — bottom sheet */
+  /* Cart panel — overlay completo, blanco sólido */
   .cart-panel{
+    display:none;
     position:fixed!important;
-    bottom:0!important;
+    top:var(--nav)!important;
     left:0!important;
     right:0!important;
-    top:auto!important;
+    bottom:0!important;
     width:100%!important;
-    max-height:90vh;
-    border-left:none!important;
-    border-radius:16px 16px 0 0;
-    box-shadow:0 -8px 32px rgba(0,0,0,.2);
-    transform:translateY(110%)!important;
-    transition:transform .3s cubic-bezier(.32,.72,0,1)!important;
-    z-index:400!important;
+    max-height:none!important;
+    border:none!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    transform:none!important;
+    transition:none!important;
+    z-index:500!important;
     background:var(--white)!important;
-    display:flex!important;
-    flex-direction:column;
-    overflow:hidden;
-  }
-  .cart-panel.sheet-open{
-    transform:translateY(0)!important;
-  }
-  .cart-panel::before{
-    content:'';
-    display:block;
-    width:40px;height:4px;
-    background:var(--gray3);
-    border-radius:2px;
-    margin:10px auto 2px;
-    flex-shrink:0;
-  }
-  .cp-header{padding:8px 16px 10px;flex-shrink:0}
-  .cp-title{font-size:13px}
-  .cp-form{
-    overflow-y:auto;
+    overflow-y:auto!important;
     -webkit-overflow-scrolling:touch;
-    flex:1;
-    padding:12px 14px;
-    gap:10px;
   }
-  .finput,.fsel{font-size:14px;padding:10px 10px}
-  .flabel{font-size:10px}
-  .frow{gap:8px}
-  .calc-block{margin:4px 14px 0}
-  .calc-inner{padding:10px 12px}
+  .cart-panel.sheet-open{display:flex!important;flex-direction:column!important}
+
+  /* Botón cerrar en el header */
+  .cp-header{
+    padding:14px 16px;
+    position:sticky;top:0;
+    background:var(--white);
+    z-index:10;
+    border-bottom:1px solid var(--gray2);
+  }
+
+  /* Formulario más grande y cómodo */
+  .cp-form{padding:14px 16px;gap:12px;overflow-y:visible;flex:none}
+  .finput,.fsel{font-size:16px;padding:12px 10px}
+  .flabel{font-size:11px;margin-bottom:2px}
+  .frow{gap:10px}
+  .calc-block{margin:0 16px}
+  .calc-inner{padding:12px}
   .clabel{font-size:10px}
-  .cval{font-size:12px}
-  .ctlabel{font-size:11px}
-  .ctval{font-size:22px}
-  .cp-footer{padding:12px 14px 32px;flex-shrink:0}
-  .sell-btn{font-size:13px;padding:14px}
-  .clear-btn{font-size:11px;padding:9px}
-  .sel-strip{flex-shrink:0;padding:10px 14px}
-  .sel-name{font-size:12px}
-  .foto-section{padding:0 14px 8px;flex-shrink:0}
+  .cval{font-size:13px}
+  .ctval{font-size:24px}
+  .cp-footer{padding:14px 16px 40px;flex-shrink:0}
+  .sell-btn{font-size:15px;padding:16px}
+  .clear-btn{font-size:12px;padding:10px}
+  .foto-section{padding:0 16px 10px}
 
-  /* Backdrop */
-  .sheet-backdrop{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,.35);
-    z-index:299;
-  }
-  .sheet-backdrop.show{display:block}
-
-  /* FAB button */
+  /* FAB */
   .sheet-fab{
     display:flex;
-    position:fixed;
-    bottom:20px;right:16px;
-    width:56px;height:56px;
-    border-radius:50%;
-    background:var(--black);
-    color:var(--white);
+    position:fixed;bottom:24px;right:20px;
+    width:56px;height:56px;border-radius:50%;
+    background:var(--black);color:var(--white);
     align-items:center;justify-content:center;
-    font-size:28px;line-height:1;
-    box-shadow:0 4px 20px rgba(0,0,0,.3);
-    cursor:pointer;
-    z-index:298;
-    border:none;
-    font-family:var(--font);
+    font-size:28px;box-shadow:0 4px 20px rgba(0,0,0,.3);
+    cursor:pointer;z-index:400;border:none;
   }
   .sheet-fab.hidden{display:none!important}
+  .sheet-backdrop{display:none}
 
-  /* Historial */
+  /* Resto de páginas */
   .hist-body{flex-direction:column}
-  .hist-right{
-    width:100%;border-left:none;
-    border-top:1px solid var(--gray2);
-    max-height:260px;
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
-  }
-  .hist-left{
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    flex:1;
-  }
-  .hist-toolbar{
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
-  }
+  .hist-right{width:100%;border-left:none;border-top:1px solid var(--gray2);max-height:260px;overflow-y:auto}
+  .hist-left{overflow-x:auto;-webkit-overflow-scrolling:touch;flex:1}
+  .hist-toolbar{overflow-x:auto;scrollbar-width:none}
   .hist-toolbar::-webkit-scrollbar{display:none}
-
-  /* Resumenes */
   .res-grid{grid-template-columns:1fr}
   #page-resumenes{overflow-y:auto;-webkit-overflow-scrolling:touch}
-
-  /* Config */
   .config-grid{grid-template-columns:1fr}
   #page-config{overflow-y:auto;-webkit-overflow-scrolling:touch}
-
-  /* Operaciones */
-  .ops-body{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-  .ops-left{
-    border-right:none;border-bottom:1px solid var(--gray2);
-    overflow-y:auto;max-height:230px;
-  }
+  .ops-body{grid-template-columns:1fr}
+  .ops-left{border-right:none;border-bottom:1px solid var(--gray2);overflow-y:auto;max-height:230px}
   .ops-btn{min-height:58px;padding:0 20px}
   .ops-label{font-size:17px}
-
-  /* Modal */
   .modal{width:96vw;max-height:85vh;overflow-y:auto}
-  .m-header,.m-body,.m-footer{padding-left:16px;padding-right:16px}
-
-  /* Foto */
-  .foto-section{padding:0 14px 6px}
 }
 
 /* Sheet elements — hidden on desktop, managed by mobile CSS */
@@ -821,6 +731,7 @@ nav{
   <!-- Cart -->
   <div class="cart-panel">
     <div class="cp-header">
+      <button id="mobile-back-btn" onclick="closeSheet()" style="display:none;background:none;border:none;font-size:20px;cursor:pointer;padding:0 10px 0 0;color:var(--text)">←</button>
       <span class="cp-title">Nueva venta</span>
       <span class="cp-sub" id="vcount">0 ventas hoy</span>
     </div>
@@ -920,7 +831,6 @@ nav{
 </div>
 
 <!-- Sheet backdrop (mobile) -->
-<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()"></div>
 <!-- FAB para abrir sheet en mobile -->
 <button class="sheet-fab" id="sheet-fab" onclick="openSheet()">+</button>
 
@@ -1832,26 +1742,24 @@ function isMobile() { return window.innerWidth <= 768; }
 
 function openSheet() {
   if (!isMobile()) return;
-  try {
-    const panel = document.querySelector('.cart-panel');
-    const backdrop = document.getElementById('sheet-backdrop');
-    const fab = document.getElementById('sheet-fab');
-    if (panel) panel.classList.add('sheet-open');
-    if (backdrop) backdrop.classList.add('show');
-    if (fab) fab.classList.add('hidden');
-  } catch(e) { console.warn('openSheet:', e); }
+  const panel = document.querySelector('.cart-panel');
+  const fab = document.getElementById('sheet-fab');
+  const backBtn = document.getElementById('mobile-back-btn');
+  if (panel) panel.classList.add('sheet-open');
+  if (fab) fab.classList.add('hidden');
+  if (backBtn) backBtn.style.display = 'inline';
+  // Scroll al top del panel
+  if (panel) panel.scrollTop = 0;
 }
 
 function closeSheet() {
   if (!isMobile()) return;
-  try {
-    const panel = document.querySelector('.cart-panel');
-    const backdrop = document.getElementById('sheet-backdrop');
-    const fab = document.getElementById('sheet-fab');
-    if (panel) panel.classList.remove('sheet-open');
-    if (backdrop) backdrop.classList.remove('show');
-    if (fab) fab.classList.remove('hidden');
-  } catch(e) { console.warn('closeSheet:', e); }
+  const panel = document.querySelector('.cart-panel');
+  const fab = document.getElementById('sheet-fab');
+  const backBtn = document.getElementById('mobile-back-btn');
+  if (panel) panel.classList.remove('sheet-open');
+  if (fab) fab.classList.remove('hidden');
+  if (backBtn) backBtn.style.display = 'none';
 }
 
 function selectProdMobile(id) {
@@ -1861,14 +1769,6 @@ function selectProdMobile(id) {
   if (isMobile()) openSheet();
 }
 
-// Swipe down para cerrar
-let _touchY = 0;
-document.addEventListener('touchstart', e => { _touchY = e.touches[0].clientY; }, {passive:true});
-document.addEventListener('touchend', e => {
-  if (!isMobile()) return;
-  if (!document.querySelector('.cart-panel').classList.contains('sheet-open')) return;
-  if (e.changedTouches[0].clientY - _touchY > 80) closeSheet();
-}, {passive:true});
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeSheet(); });
 
 // ── FOTO ──────────────────────────────────────────────────────────────────────
