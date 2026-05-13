@@ -722,6 +722,9 @@ nav{
   .foto-section{padding:0 14px 6px}
 }
 
+/* Sheet elements — hidden on desktop, managed by mobile CSS */
+.sheet-backdrop,.sheet-fab{display:none}
+
 /* Foto — global */
 .foto-section{padding:0 14px 8px;flex-shrink:0}
 .foto-btn{
@@ -1818,15 +1821,27 @@ function toast(msg,type=''){
 function isMobile() { return window.innerWidth <= 768; }
 
 function openSheet() {
-  document.querySelector('.cart-panel').classList.add('sheet-open');
-  document.getElementById('sheet-backdrop').classList.add('show');
-  document.getElementById('sheet-fab').classList.add('hidden');
+  if (!isMobile()) return;
+  try {
+    const panel = document.querySelector('.cart-panel');
+    const backdrop = document.getElementById('sheet-backdrop');
+    const fab = document.getElementById('sheet-fab');
+    if (panel) panel.classList.add('sheet-open');
+    if (backdrop) backdrop.classList.add('show');
+    if (fab) fab.classList.add('hidden');
+  } catch(e) { console.warn('openSheet:', e); }
 }
 
 function closeSheet() {
-  document.querySelector('.cart-panel').classList.remove('sheet-open');
-  document.getElementById('sheet-backdrop').classList.remove('show');
-  document.getElementById('sheet-fab').classList.remove('hidden');
+  if (!isMobile()) return;
+  try {
+    const panel = document.querySelector('.cart-panel');
+    const backdrop = document.getElementById('sheet-backdrop');
+    const fab = document.getElementById('sheet-fab');
+    if (panel) panel.classList.remove('sheet-open');
+    if (backdrop) backdrop.classList.remove('show');
+    if (fab) fab.classList.remove('hidden');
+  } catch(e) { console.warn('closeSheet:', e); }
 }
 
 function selectProdMobile(id) {
