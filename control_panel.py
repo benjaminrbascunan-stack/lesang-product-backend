@@ -447,11 +447,13 @@ def pos_eliminar_venta(mes: str, row_index: int):
 @app.get("/pos/sheet-url")
 def pos_sheet_url():
     try:
-        from pos_sheets import get_or_create_sheet
+        from pos_sheets import get_or_create_sheet, _SHEET_ID
         sid = get_or_create_sheet()
-        return {"url": f"https://docs.google.com/spreadsheets/d/{sid}"}
+        return {"url": f"https://docs.google.com/spreadsheets/d/{sid}", "error": None}
     except Exception as e:
-        return {"url": None, "error": str(e)}
+        err = str(e)
+        print(f"[Sheets] sheet-url error: {err}")
+        return {"url": None, "error": err}
 
 # ── Subir foto de venta ──────────────────────────────────────────────────────
 from fastapi import UploadFile, File, Form as FastForm

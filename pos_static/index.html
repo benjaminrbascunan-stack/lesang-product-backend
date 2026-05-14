@@ -544,6 +544,19 @@ nav{
 .empty-state svg{width:32px;height:32px;stroke:var(--gray3);fill:none;stroke-width:1}
 .empty-txt{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4)}
 
+/* ── Sheets warning banner ── */
+.sheets-warning{
+  display:none;
+  position:fixed;top:var(--nav);left:0;right:0;
+  background:#cc3300;color:#fff;
+  padding:8px 16px;
+  font-size:10px;letter-spacing:.1em;
+  text-align:center;z-index:190;
+  display:none;align-items:center;justify-content:center;gap:10px;
+}
+.sheets-warning.show{display:flex}
+.sheets-warning a{color:#fff;text-decoration:underline;cursor:pointer}
+
 /* ══ MOBILE ══ */
 @media(max-width:768px){
   /* Nav */
@@ -709,6 +722,12 @@ nav{
   </div>
 </nav>
 
+<!-- Sheets warning banner -->
+<div class="sheets-warning" id="sheets-warning">
+  ⚠ Google Sheets no conectado — el historial no se guardará.
+  <a onclick="window.location.reload()">Reintentar</a>
+</div>
+
 <!-- PAGE: POS -->
 <div class="page active" id="page-pos">
   <div class="pos-left">
@@ -868,7 +887,7 @@ nav{
       </div>
       <div class="exp-wrap">
         <button class="expbtn" onclick="exportCSV()">↓ Exportar CSV</button>
-        <button class="expbtn sec" onclick="openSheet()">↗ Ver en Google Sheets</button>
+        <button class="expbtn sec" onclick="openGoogleSheet()">↗ Ver en Google Sheets</button>
       </div>
     </div>
   </div>
@@ -993,7 +1012,52 @@ nav{
 <div class="toast" id="toast"></div>
 
 <script>
+// Global error handler - prevents Safari from crashing silently
+window.onerror = function(msg, src, line, col, err) {
+  console.error('[POS Error]', msg, 'L'+line, err);
+  return true; // prevent default crash behavior
+};
+window.onunhandledrejection = function(e) {
+  console.error('[POS Promise Error]', e.reason);
+};
+
 const API = window.location.origin;
+
+// ── BOTTOM SHEET (mobile) ────────────────────────────────────────────────────
+function isMobile() { return window.innerWidth <= 768; }
+
+function openSheet() {
+  if (!isMobile()) return;
+  const panel = document.querySelector('.cart-panel');
+  const fab = document.getElementById('sheet-fab');
+  const backBtn = document.getElementById('mobile-back-btn');
+  if (panel) panel.classList.add('sheet-open');
+  if (fab) fab.classList.add('hidden');
+  if (backBtn) backBtn.style.display = 'inline';
+  // Scroll al top del panel
+  if (panel) panel.scrollTop = 0;
+}
+
+function closeSheet() {
+  if (!isMobile()) return;
+  const panel = document.querySelector('.cart-panel');
+  const fab = document.getElementById('sheet-fab');
+  const backBtn = document.getElementById('mobile-back-btn');
+  if (panel) panel.classList.remove('sheet-open');
+  if (fab) fab.classList.remove('hidden');
+  if (backBtn) backBtn.style.display = 'none';
+}
+
+function selectProdMobile(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p || !p.available) return;
+  selectProd(id);
+  if (isMobile()) openSheet();
+}
+
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeSheet(); });
+
+
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MES = MESES[new Date().getMonth()];
 
@@ -1056,7 +1120,7 @@ async function loadProducts(){
 
 function renderGrid(){
   const q=document.getElementById('search').value.toLowerCase();
-  const f=document.querySelector('.pfbtn.active')?.dataset.f||'all';
+  const activeFilter=document.querySelector('.pfbtn.active');const f=activeFilter?activeFilter.dataset.f:'all';
   let list=allProducts;
   if(q) list=list.filter(p=>p.title.toLowerCase().includes(q));
   if(f==='available') list=list.filter(p=>p.available);
@@ -1123,7 +1187,7 @@ function calcular(precio,pago,vendedor,marca){
   const comB=precio*pctB;
   const esExt=(CFG.vendedores_externos||[]).includes(vendedor);
   // Comisión solo aplica en Tienda y Consignación, NO en marcas externas
-  const marcaActual=marca||document.getElementById('f-marca')?.value||'Tienda';
+  const marcaEl=document.getElementById('f-marca');const marcaActual=marca||(marcaEl?marcaEl.value:'')||'Tienda';
   const marcaSinCom=MARCAS_SIN_COMISION_VEND.includes(marcaActual);
   const pctV=(esExt&&!marcaSinCom)?(CFG.com_externo_pct||0.05):0;
   const comV=precio*pctV;
@@ -1179,8 +1243,8 @@ async function registrarVenta(){
     base_com_vendedor:c.precio,pct_com_vendedor:c.pctV,com_vendedor:+c.comV.toFixed(4),
     neto_tienda:+c.neto.toFixed(4),
     observaciones:obs,marca,
-    shopify_id:selectedProd?.id||null,
-    shopify_variant:selectedProd?.variant_id||null,
+    shopify_id:selectedProd ? selectedProd.id : null||null,
+    shopify_variant:selectedProd ? selectedProd.variant_id : null||null,
   };
 
   try{
@@ -1261,6 +1325,9 @@ async function loadHistorial(mes){
     if(!r.ok) throw new Error();
     histData=await r.json();
     document.getElementById('hist-badge').textContent=histData.resumen.total_ventas||0;
+    // Si cargó bien, ocultar warning
+    const w=document.getElementById('sheets-warning');
+    if(w&&histData.resumen.total_ventas>0) w.classList.remove('show');
   }catch{histData={ventas:[],resumen:{},by_vendedor:{}};}
   renderHistorial();
 }
@@ -1486,7 +1553,7 @@ function exportCSV(){
     x.precio_bruto,x.tipo_pago,x.iva.toFixed(2),x.pct_com_bancaria,x.com_bancaria.toFixed(2),
     x.base_com_vendedor,x.pct_com_vendedor,x.com_vendedor.toFixed(2),x.neto_tienda.toFixed(2),
     x.observaciones,x.marca,x.order_name||'']
-    .map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(','));
+    .map(c=>`"${String(c===null||c===undefined?'':c).replace(/"/g,'""')}"`).join(','));
   const csv=[cols.join(','),...rows].join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));
@@ -1498,10 +1565,27 @@ async function loadSheetUrl(){
   try{
     const r=await fetch(`${API}/pos/sheet-url`);
     const d=await r.json();
-    if(d.url){sheetUrl=d.url;const l=document.getElementById('sheet-link');l.href=d.url;l.style.display='block';}
-  }catch{}
+    if(d.url&&!d.error){
+      sheetUrl=d.url;
+      const l=document.getElementById('sheet-link');
+      if(l){l.href=d.url;l.style.display='block';}
+      // Ocultar warning si estaba visible
+      const w=document.getElementById('sheets-warning');
+      if(w) w.classList.remove('show');
+    } else {
+      // Mostrar warning — sheets no conectado
+      const w=document.getElementById('sheets-warning');
+      if(w) w.classList.add('show');
+    }
+  }catch{
+    const w=document.getElementById('sheets-warning');
+    if(w) w.classList.add('show');
+  }
 }
-function openSheet(){if(sheetUrl)window.open(sheetUrl,'_blank');else toast('Google Sheet no configurado','err');}
+function openGoogleSheet(){
+  if(sheetUrl) window.open(sheetUrl,'_blank');
+  else toast('Google Sheet no disponible — regenerar token','err');
+}
 
 // ── Nav
 function goTo(name,btn){
@@ -1738,39 +1822,6 @@ function toast(msg,type=''){
   tt=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
-// ── BOTTOM SHEET (mobile) ────────────────────────────────────────────────────
-function isMobile() { return window.innerWidth <= 768; }
-
-function openSheet() {
-  if (!isMobile()) return;
-  const panel = document.querySelector('.cart-panel');
-  const fab = document.getElementById('sheet-fab');
-  const backBtn = document.getElementById('mobile-back-btn');
-  if (panel) panel.classList.add('sheet-open');
-  if (fab) fab.classList.add('hidden');
-  if (backBtn) backBtn.style.display = 'inline';
-  // Scroll al top del panel
-  if (panel) panel.scrollTop = 0;
-}
-
-function closeSheet() {
-  if (!isMobile()) return;
-  const panel = document.querySelector('.cart-panel');
-  const fab = document.getElementById('sheet-fab');
-  const backBtn = document.getElementById('mobile-back-btn');
-  if (panel) panel.classList.remove('sheet-open');
-  if (fab) fab.classList.remove('hidden');
-  if (backBtn) backBtn.style.display = 'none';
-}
-
-function selectProdMobile(id) {
-  const p = allProducts.find(x => x.id === id);
-  if (!p || !p.available) return;
-  selectProd(id);
-  if (isMobile()) openSheet();
-}
-
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeSheet(); });
 
 // ── FOTO ──────────────────────────────────────────────────────────────────────
 let fotoFile = null;
