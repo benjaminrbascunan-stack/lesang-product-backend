@@ -626,14 +626,14 @@ nav{
   .clear-btn{font-size:12px;padding:10px}
   .foto-section{padding:0 16px 10px}
 
-  /* FAB */
+  /* FAB - controlado solo por JS */
   .sheet-fab{
-    display:flex !important;
     position:fixed !important;
     bottom:24px !important;
     right:20px !important;
     width:56px;height:56px;border-radius:50%;
     background:var(--black);color:var(--white);
+    display:flex;
     align-items:center;justify-content:center;
     font-size:28px;box-shadow:0 4px 20px rgba(0,0,0,.3);
     cursor:pointer;z-index:9999 !important;border:none;
@@ -851,9 +851,6 @@ nav{
     </div>
   </div>
 </div>
-
-<!-- FAB fuera del cart-panel pero dentro de page-pos -->
-<button class="sheet-fab" id="sheet-fab" onclick="openSheet()">+</button>
 
 <!-- PAGE: HISTORIAL -->
 <div class="page" id="page-hist">
@@ -1188,7 +1185,7 @@ function selectProd(id){
     ?`<img class="sel-thumb" src="${p.image}" alt="">`
     :`<div class="sel-thumb-ph"><svg viewBox="0 0 24 24" width="14" height="14" stroke="#999" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>`;
 
-  recalc(); renderGrid();
+  recalc();
   toast(p.title.split(' ').slice(0,3).join(' ')+' seleccionado','ok');
 }
 
@@ -1197,7 +1194,7 @@ function deselect(){
   document.getElementById('sel-strip').classList.remove('show');
   document.getElementById('f-precio').value='';
   document.getElementById('f-nombre').value='';
-  recalc(); renderGrid();
+  recalc();
 }
 
 // Marcas que NO generan comisión para vendedoras externas
@@ -1916,5 +1913,8 @@ setInterval(async () => {
 }, 60 * 60 * 1000); // cada 1 hora
 
 </script>
+
+<!-- FAB global - controlado por JS -->
+<button class="sheet-fab" id="sheet-fab" onclick="openSheet()" style="display:none">+</button>
 </body>
 </html>
