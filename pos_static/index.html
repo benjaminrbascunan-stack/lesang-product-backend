@@ -643,8 +643,8 @@ nav{
   .modal{width:96vw;max-height:85vh;overflow-y:auto}
 }
 
-/* Sheet elements — hidden on desktop, managed by mobile CSS */
-.sheet-backdrop,.sheet-fab{display:none}
+/* Sheet elements — FAB solo visible en mobile, gestionado por media query */
+.sheet-fab{display:none}
 
 /* Foto — global */
 .foto-section{padding:0 14px 8px;flex-shrink:0}
@@ -1823,16 +1823,18 @@ init();
 
 // ── AUTO-REFRESH CATÁLOGO ────────────────────────────────────────────────────
 setInterval(async () => {
-  if (selectedProd) return;
   try {
+    if (selectedProd) return;
     const r = await fetch(`${API}/pos/products`);
     if (!r.ok) return;
     const d = await r.json();
     const prev = allProducts.map(p=>p.stock).join(',');
     allProducts = d.products;
     if (prev !== allProducts.map(p=>p.stock).join(',')) renderGrid();
-  } catch {}
-}, 5 * 60 * 1000);
+  } catch(e) {
+    console.warn('[POS] Auto-refresh error:', e);
+  }
+}, 60 * 60 * 1000); // cada 1 hora
 
 </script>
 </body>
