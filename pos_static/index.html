@@ -1027,26 +1027,32 @@ const API = window.location.origin;
 // ── BOTTOM SHEET (mobile) ────────────────────────────────────────────────────
 function isMobile() { return window.innerWidth <= 768; }
 
+// Hide FAB by default — only show on POS page via goTo()
+document.addEventListener('DOMContentLoaded', function() {
+  var fab = document.getElementById('sheet-fab');
+  if (fab && !isMobile()) fab.style.display = 'none';
+});
+
 function openSheet() {
   if (!isMobile()) return;
-  const panel = document.querySelector('.cart-panel');
-  const fab = document.getElementById('sheet-fab');
-  const backBtn = document.getElementById('mobile-back-btn');
-  if (panel) panel.classList.add('sheet-open');
-  if (fab) fab.classList.add('hidden');
+  var panel = document.querySelector('.cart-panel');
+  var fab = document.getElementById('sheet-fab');
+  var backBtn = document.getElementById('mobile-back-btn');
+  if (panel) { panel.classList.add('sheet-open'); panel.scrollTop = 0; }
+  if (fab) fab.style.display = 'none';
   if (backBtn) backBtn.style.display = 'inline';
-  // Scroll al top del panel
-  if (panel) panel.scrollTop = 0;
 }
 
 function closeSheet() {
   if (!isMobile()) return;
-  const panel = document.querySelector('.cart-panel');
-  const fab = document.getElementById('sheet-fab');
-  const backBtn = document.getElementById('mobile-back-btn');
+  var panel = document.querySelector('.cart-panel');
+  var fab = document.getElementById('sheet-fab');
+  var backBtn = document.getElementById('mobile-back-btn');
   if (panel) panel.classList.remove('sheet-open');
-  if (fab) fab.classList.remove('hidden');
+  if (fab) fab.style.display = 'flex';
   if (backBtn) backBtn.style.display = 'none';
+  // Reset form when closing
+  resetForm();
 }
 
 function selectProdMobile(idx) {
@@ -1103,7 +1109,11 @@ async function init(){
   setLoad(90,'Conectando Google Sheets...');
   await loadSheetUrl();
   setLoad(100,'Listo');
-  setTimeout(()=>document.getElementById('loading').classList.add('out'),500);
+  setTimeout(function(){
+    document.getElementById('loading').classList.add('out');
+    var fab=document.getElementById('sheet-fab');
+    if(fab&&isMobile()) fab.style.display='flex';
+  },500);
 }
 
 async function loadConfig(){
@@ -1611,6 +1621,9 @@ function goTo(name,btn){
   if(name==='hist'){buildMesTabs();renderHistorial();}
   if(name==='config') renderConfigPage();
   if(name==='resumenes') initResumenes();
+  // FAB solo visible en POS
+  var fab=document.getElementById('sheet-fab');
+  if(fab) fab.style.display = (name==='pos' && isMobile()) ? 'flex' : 'none';
 }
 
 // ── RESUMENES ─────────────────────────────────────────────────────────────────
