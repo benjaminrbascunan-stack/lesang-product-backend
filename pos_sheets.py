@@ -50,7 +50,7 @@ C_ORANGE = {"red": 1.0,  "green": 0.357,"blue": 0.0}
 C_GRAY1  = {"red": 0.98, "green": 0.98, "blue": 0.98}
 C_GRAY2  = {"red": 0.85, "green": 0.85, "blue": 0.85}
 
-_SHEET_ID = ""
+_SHEET_ID = os.environ.get("POS_SHEET_ID", "")  # puede forzarse desde Railway
 
 
 def get_creds() -> Credentials:
@@ -496,11 +496,17 @@ def get_ventas_mes(mes: str) -> list:
 
     result = sheets.spreadsheets().values().get(
         spreadsheetId=sid,
-        range=f"{mes}!A3:T",
-        valueRenderOption="UNFORMATTED_VALUE",  # números como números, sin formato
+        range=f"{mes}!A1:T",  # leer desde fila 1 para debug
+        valueRenderOption="UNFORMATTED_VALUE",
     ).execute()
 
-    rows   = result.get("values", [])
+    all_rows = result.get("values", [])
+    print(f"[Sheets] {mes}: {len(all_rows)} filas totales")
+    for i, r in enumerate(all_rows[:5]):
+        print(f"  Fila {i+1}: {str(r[:3])[:80]}")
+    
+    # Datos empiezan en fila 3 (index 2)
+    rows  = all_rows[2:] if len(all_rows) > 2 else []
     ventas = []
 
     for i, row in enumerate(rows):
