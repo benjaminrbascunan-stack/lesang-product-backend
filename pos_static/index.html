@@ -1393,7 +1393,25 @@ async function registrarVenta(){
     document.getElementById('hist-badge').textContent=histData.ventas.length+ventasHoy;
 
     mostrarModalOk({...payload,order_name:result.order_name});
-    resetForm();renderGrid();
+    resetForm();
+    // Actualizar stock del producto vendido en el grid sin re-renderizar todo
+    if(selectedProd){
+      var pp=allProducts.find(function(p){return p.id===selectedProd.id;});
+      if(pp){ pp.stock=Math.max(0,pp.stock-1); pp.available=pp.stock>0; }
+      // Solo en desktop re-renderizar, en mobile actualizar la card visualmente
+      if(!isMobile()){
+        renderGrid();
+      } else {
+        // Marcar card como sin stock si corresponde
+        var cards=document.querySelectorAll('.pcard');
+        cards.forEach(function(c,i){
+          var p=_mobileList[i];
+          if(p&&p.id===(selectedProd?selectedProd.id:null)&&!p.available){
+            c.classList.add('sold');
+          }
+        });
+      }
+    }
     loadHistorial(MES);
     if(isMobile()) closeSheet();
   }catch(e){
@@ -1408,12 +1426,18 @@ async function registrarVenta(){
 function resetForm(){
   selectedProd=null;
   document.getElementById('sel-strip').classList.remove('show');
-  ['f-precio','f-nombre','f-talla','f-obs'].forEach(id=>document.getElementById(id).value='');
+  ['f-precio','f-nombre','f-talla','f-obs'].forEach(function(id){document.getElementById(id).value='';});
   resetFoto();
   document.getElementById('f-vend').value='';
   document.getElementById('sell-btn').disabled=true;
-  ['c-bruto','c-iva','c-banco','c-cvend','c-neto'].forEach(id=>document.getElementById(id).textContent='—');
-  renderGrid();
+  ['c-bruto','c-iva','c-banco','c-cvend','c-neto'].forEach(function(id){document.getElementById(id).textContent='—';});
+  // Solo re-renderizar grid en desktop — en mobile el grid ya está cargado
+  if(!isMobile()) renderGrid();
+  // En mobile solo quitar la clase sel de la card seleccionada
+  else {
+    var sel=document.querySelector('.pcard.sel');
+    if(sel) sel.classList.remove('sel');
+  }
 }
 
 function mostrarModalOk(v){
