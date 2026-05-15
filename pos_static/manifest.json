@@ -1,0 +1,26 @@
+{
+  "name": "Lé Sang — POS",
+  "short_name": "LESANG",
+  "description": "Sistema de punto de venta Lé Sang Gallery",
+  "start_url": "/pos",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%23000'/%3E%3Crect x='0' y='160' width='192' height='32' fill='%23FF5B00'/%3E%3Ctext x='16' y='130' font-family='Arial,sans-serif' font-size='72' font-weight='300' letter-spacing='8' fill='%23fff'%3ELS%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23000'/%3E%3Crect x='0' y='430' width='512' height='82' fill='%23FF5B00'/%3E%3Ctext x='40' y='350' font-family='Arial,sans-serif' font-size='200' font-weight='300' letter-spacing='20' fill='%23fff'%3ELS%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "shopping"],
+  "lang": "es"
+}

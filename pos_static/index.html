@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LESANG — POS</title>
+<link rel="manifest" href="/pos/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="LESANG">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%23000'/%3E%3Crect x='0' y='150' width='180' height='30' fill='%23FF5B00'/%3E%3Ctext x='12' y='124' font-family='Arial,sans-serif' font-size='72' font-weight='300' letter-spacing='4' fill='%23fff'%3ELS%3C/text%3E%3C/svg%3E">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20fill='%23000'/%3E%3Crect%20x='0'%20y='26'%20width='32'%20height='6'%20fill='%23FF5B00'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1950,6 +1956,36 @@ function resetFoto() {
 }
 
 init();
+
+// ── SERVICE WORKER (PWA) ─────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/pos/static/sw.js', {scope: '/pos/'})
+      .then(function(reg) {
+        console.log('[PWA] Service Worker registrado:', reg.scope);
+        // Escuchar actualizaciones
+        reg.onupdatefound = function() {
+          var newWorker = reg.installing;
+          newWorker.onstatechange = function() {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              toast('Nueva versión disponible — recarga para actualizar', '');
+            }
+          };
+        };
+      })
+      .catch(function(err) {
+        console.log('[PWA] SW error:', err);
+      });
+  });
+}
+
+function clearPWACache() {
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({type: 'CLEAR_PRODUCTS_CACHE'});
+  }
+  // También limpiar localStorage
+  clearProductCache();
+}
 
 // ── AUTO-REFRESH CATÁLOGO ────────────────────────────────────────────────────
 setInterval(async () => {

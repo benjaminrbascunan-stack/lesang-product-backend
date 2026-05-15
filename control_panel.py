@@ -528,6 +528,15 @@ app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), na
 async def serve_pos():
     return FileResponse(str(BASE_DIR / "pos_static" / "index.html"))
 
+@app.get("/pos/sw.js")
+async def serve_sw():
+    """Service Worker debe servirse desde /pos/ scope"""
+    return FileResponse(
+        str(BASE_DIR / "pos_static" / "sw.js"),
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/pos/"}
+    )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PANEL HTML (sin cambios)
