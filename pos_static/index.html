@@ -1171,6 +1171,7 @@ function clearProductCache(){
 var _mobilePage = 0;
 var _mobilePageSize = 20;
 var _mobileList = [];
+var _mobileRenderedCount = 0;
 
 function renderGrid(){
   var q=document.getElementById('search').value.toLowerCase();
@@ -1188,14 +1189,16 @@ function renderGrid(){
   // Sin stock y todos van paginados de 20
   if(isMobile() && !q){
     if(f==='all'){
-      // Separar: primero los con stock (todos), luego sin stock paginados
+      // Primero con stock, luego sin stock
       var withStock = fullList.filter(function(p){ return p.available; });
       var noStock   = fullList.filter(function(p){ return !p.available; });
       _mobileList   = withStock.concat(noStock);
-      _mobilePage   = 0;
-      renderGridMobile(_mobileList, withStock.length);
-      return;
+    } else {
+      _mobileList = fullList;
     }
+    _mobilePage = 0;
+    renderGridMobile(_mobileList);
+    return;
   }
 
   // Desktop o con búsqueda: mostrar todo
@@ -1217,41 +1220,61 @@ function renderGridFull(list){
   document.getElementById('pcount').textContent=list.length+' productos';
 }
 
-function renderGridMobile(list, stockCount){
+function renderGridMobile(list){
   var grid=document.getElementById('grid');
   if(!list.length){
-    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-txt">Sin productos con stock</div></div>';
+    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-txt">Sin productos</div></div>';
     document.getElementById('pcount').textContent='0 productos';
+    _mobileRenderedCount=0;
     return;
   }
-
-  // Mostrar todos los con stock + primera página de sin stock
-  var withStock = list.slice(0, stockCount);
-  var noStock   = list.slice(stockCount);
-  var pageEnd   = Math.min(_mobilePage * _mobilePageSize + _mobilePageSize, noStock.length);
-  var showNoStock = noStock.slice(0, pageEnd);
-  var showList  = withStock.concat(showNoStock);
-
-  var html = showList.map(function(p,i){
+  // Primera página: limpiar grid y mostrar primeros 20
+  _mobileRenderedCount = Math.min(_mobilePageSize, list.length);
+  var html = list.slice(0, _mobileRenderedCount).map(function(p,i){
     return makeCardHTML(p,i);
   }).join('');
 
-  // Botón cargar más sin stock
-  if(pageEnd < noStock.length){
-    html += '<div style="grid-column:1/-1;padding:14px;text-align:center;cursor:pointer;font-size:10px;letter-spacing:.15em;color:var(--gray4);text-transform:uppercase;border-top:1px solid var(--gray2)" onclick="loadMoreMobile('+stockCount+')">'
-      +'Ver más sin stock ('+(noStock.length - pageEnd)+' restantes)</div>';
+  if(_mobileRenderedCount < list.length){
+    html += '<div id="load-more-btn" style="grid-column:1/-1;padding:14px;text-align:center;cursor:pointer;font-size:10px;letter-spacing:.15em;color:var(--gray4);text-transform:uppercase;border-top:1px solid var(--gray2)" onclick="loadMoreMobile()">'
+      +'Ver más ('+(list.length-_mobileRenderedCount)+' restantes)</div>';
   }
 
   grid.innerHTML = html;
-  document.getElementById('pcount').textContent=stockCount+' con stock · '+noStock.length+' sin stock';
+  document.getElementById('pcount').textContent=list.length+' productos';
 }
 
-function loadMoreMobile(stockCount){
-  _mobilePage++;
-  renderGridMobile(_mobileList, stockCount);
-  // Scroll al final para ver los nuevos
-  var grid=document.getElementById('grid');
-  if(grid) grid.scrollIntoView({behavior:'smooth', block:'end'});
+function loadMoreMobile(){
+  var list = _mobileList;
+  var start = _mobileRenderedCount;
+  var end   = Math.min(start + _mobilePageSize, list.length);
+  
+  // Quitar botón anterior
+  var oldBtn = document.getElementById('load-more-btn');
+  if(oldBtn) oldBtn.remove();
+
+  // Agregar nuevas cards al grid
+  var grid = document.getElementById('grid');
+  var frag = document.createDocumentFragment();
+  
+  for(var i=start; i<end; i++){
+    var div = document.createElement('div');
+    div.innerHTML = makeCardHTML(list[i], i);
+    frag.appendChild(div.firstChild);
+  }
+
+  _mobileRenderedCount = end;
+
+  // Agregar botón si hay más
+  if(end < list.length){
+    var btn = document.createElement('div');
+    btn.id = 'load-more-btn';
+    btn.style.cssText='grid-column:1/-1;padding:14px;text-align:center;cursor:pointer;font-size:10px;letter-spacing:.15em;color:var(--gray4);text-transform:uppercase;border-top:1px solid var(--gray2)';
+    btn.textContent='Ver más ('+(list.length-end)+' restantes)';
+    btn.onclick = loadMoreMobile;
+    frag.appendChild(btn);
+  }
+
+  grid.appendChild(frag);
 }
 
 function makeCardHTML(p, i){

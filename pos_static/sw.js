@@ -1,6 +1,6 @@
 // Lé Sang POS — Service Worker
 // Versión del cache — incrementar para forzar actualización
-var CACHE_VERSION = 'lesang-pos-v1';
+var CACHE_VERSION = 'lesang-pos-v2';
 var STATIC_CACHE  = CACHE_VERSION + '-static';
 var PRODUCTS_CACHE = CACHE_VERSION + '-products';
 
@@ -48,7 +48,15 @@ self.addEventListener('fetch', function(event) {
   var url = new URL(event.request.url);
   var path = url.pathname;
 
-  // 1. Productos de Shopify — Cache First con revalidación en background
+  // 1. Imágenes de productos (CDN Shopify) — Cache First agresivo
+  if (url.hostname.indexOf('shopify') !== -1 || 
+      url.hostname.indexOf('cdn') !== -1 ||
+      event.request.destination === 'image') {
+    event.respondWith(cacheFirst(event.request, PRODUCTS_CACHE));
+    return;
+  }
+
+  // 2. Productos de Shopify — Cache First con revalidación en background
   if (path === '/pos/products') {
     event.respondWith(cacheFirstWithUpdate(event.request, PRODUCTS_CACHE));
     return;
