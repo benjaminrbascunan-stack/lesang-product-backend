@@ -1188,16 +1188,12 @@ function renderGrid(){
   // En mobile: por defecto mostrar solo con stock
   // Sin stock y todos van paginados de 20
   if(isMobile() && !q){
-    if(f==='all'){
-      // Primero con stock, luego sin stock
-      var withStock = fullList.filter(function(p){ return p.available; });
-      var noStock   = fullList.filter(function(p){ return !p.available; });
-      _mobileList   = withStock.concat(noStock);
-    } else {
-      _mobileList = fullList;
-    }
+    var withStock = fullList.filter(function(p){ return p.available; });
+    var noStock   = fullList.filter(function(p){ return !p.available; });
+    _mobileList   = withStock.concat(noStock);
     _mobilePage = 0;
-    renderGridMobile(_mobileList);
+    // Mostrar todos los con stock de una, sin stock paginados
+    renderGridMobile(_mobileList, withStock.length);
     return;
   }
 
@@ -1220,27 +1216,39 @@ function renderGridFull(list){
   document.getElementById('pcount').textContent=list.length+' productos';
 }
 
-function renderGridMobile(list){
+function renderGridMobile(list, stockCount){
   var grid=document.getElementById('grid');
+  stockCount = stockCount || list.length;
   if(!list.length){
     grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-txt">Sin productos</div></div>';
     document.getElementById('pcount').textContent='0 productos';
     _mobileRenderedCount=0;
     return;
   }
-  // Primera página: limpiar grid y mostrar primeros 20
-  _mobileRenderedCount = Math.min(_mobilePageSize, list.length);
-  var html = list.slice(0, _mobileRenderedCount).map(function(p,i){
-    return makeCardHTML(p,i);
+
+  // Todos los con stock de una vez
+  var withStock = list.slice(0, stockCount);
+  var noStock   = list.slice(stockCount);
+
+  var html = withStock.map(function(p,i){
+    return makeCardHTML(p, i);
   }).join('');
+
+  // Primera página de sin stock
+  var firstNoStock = noStock.slice(0, _mobilePageSize);
+  html += firstNoStock.map(function(p,i){
+    return makeCardHTML(p, stockCount+i);
+  }).join('');
+
+  _mobileRenderedCount = stockCount + firstNoStock.length;
 
   if(_mobileRenderedCount < list.length){
     html += '<div id="load-more-btn" style="grid-column:1/-1;padding:14px;text-align:center;cursor:pointer;font-size:10px;letter-spacing:.15em;color:var(--gray4);text-transform:uppercase;border-top:1px solid var(--gray2)" onclick="loadMoreMobile()">'
-      +'Ver más ('+(list.length-_mobileRenderedCount)+' restantes)</div>';
+      +'Ver sin stock ('+(list.length-_mobileRenderedCount)+' restantes)</div>';
   }
 
   grid.innerHTML = html;
-  document.getElementById('pcount').textContent=list.length+' productos';
+  document.getElementById('pcount').textContent=stockCount+' con stock · '+noStock.length+' sin stock';
 }
 
 function loadMoreMobile(){
@@ -1288,7 +1296,7 @@ function makeCardHTML(p, i){
   var isSel=selectedProd&&selectedProd.id===p.id;
   var sc=p.stock<=0?'sb-no':p.stock<=2?'sb-low':'sb-ok';
   var sl=p.stock<=0?'Sin stock':p.stock<=2?p.stock+' left':String(p.stock);
-  var thumb = p.image ? shopifyThumb(p.image, '300x300') : null;
+  var thumb = p.image ? shopifyThumb(p.image, '200x200') : null;
   var img=thumb
     ?'<img src="'+thumb+'" loading="lazy" decoding="async">'
     :'<div class="nimg"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
