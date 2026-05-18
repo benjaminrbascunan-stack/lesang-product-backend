@@ -96,7 +96,7 @@ nav{
 #sheet-link:hover{color:var(--white);border-color:#555}
 
 /* ── PAGES ── */
-.page{position:fixed;top:var(--nav);left:0;right:0;bottom:0;display:none;overflow:hidden;background:var(--white)}
+.page{position:fixed;top:var(--nav);left:0;right:0;bottom:0;width:100%;height:calc(100vh - var(--nav));display:none;overflow:hidden;background:var(--white)}
 @media(max-width:768px){.page{overflow:visible}}
 .page.active{display:flex}
 
