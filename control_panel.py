@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from typing import List, Optional
 from pydantic import BaseModel
 import httpx
+import json
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -395,6 +396,19 @@ query GetVariant($vid: ID!) {
     v["order_name"] = order_name
     result = sheets_append(v)
 
+    # Auto-marcar consignación como vendida si hay match por GID
+    if v.get("shopify_id"):
+        try:
+            from pos_sheets import get_consignaciones, marcar_consignacion_vendida
+            consigs = get_consignaciones()
+            for c in consigs:
+                if c["estado"] == "Activa" and c.get("shopify_gid") == v["shopify_id"]:
+                    marcar_consignacion_vendida(c["row_index"], order_name or "")
+                    print(f"[Consig] Auto-marcada vendida: {c['nombre_prenda']}")
+                    break
+        except Exception as e:
+            print(f"[Consig] Auto-mark error: {e}")
+
     return {
         "success": True,
         "order_name": order_name,
@@ -519,6 +533,163 @@ async def subir_foto(
         print(f"[Foto] Error: {e}")
         return {"success": False, "error": str(e)}
 
+
+# ── Consignaciones ───────────────────────────────────────────────────────────
+class ConsignacionIn(BaseModel):
+    nombre_prenda:  str
+    talla:          Optional[str] = ""
+    dueno:          str
+    instagram:      Optional[str] = ""
+    email:          Optional[str] = ""
+    telefono:       Optional[str] = ""
+    precio_venta:   float
+    valor_acordado: float
+    marca:          Optional[str] = "Consignacion"
+    notas:          Optional[str] = ""
+    foto_link:      Optional[str] = ""
+
+@app.post("/pos/consignacion")
+async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None)):
+    from datetime import datetime
+    import io
+
+    consig = body.dict()
+    foto_link = ""
+
+    # 1. Subir foto a Drive (obligatoria)
+    if foto:
+        try:
+            from pos_sheets import get_creds
+            from googleapiclient.discovery import build as gdrive_build
+            from googleapiclient.http import MediaIoBaseUpload
+
+            creds  = get_creds()
+            drive  = gdrive_build("drive","v3",credentials=creds)
+
+            # Carpeta consignaciones
+            q="name='Consignaciones — Lé Sang' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            res=drive.files().list(q=q,fields="files(id)").execute()
+            folders=res.get("files",[])
+            if folders:
+                folder_id=folders[0]["id"]
+            else:
+                folder=drive.files().create(
+                    body={"name":"Consignaciones — Lé Sang","mimeType":"application/vnd.google-apps.folder"},
+                    fields="id"
+                ).execute()
+                folder_id=folder["id"]
+
+            ts=datetime.now().strftime("%Y%m%d_%H%M%S")
+            nombre_safe=consig["nombre_prenda"].replace(" ","_")[:30]
+            filename=f"CONSIG_{ts}_{nombre_safe}.jpg"
+
+            content_bytes=await foto.read()
+            media=MediaIoBaseUpload(io.BytesIO(content_bytes),
+                                    mimetype=foto.content_type or "image/jpeg",
+                                    resumable=False)
+            uploaded=drive.files().create(
+                body={"name":filename,"parents":[folder_id]},
+                media_body=media,fields="id,webViewLink"
+            ).execute()
+            drive.permissions().create(
+                fileId=uploaded["id"],body={"type":"anyone","role":"reader"}
+            ).execute()
+            foto_link=uploaded.get("webViewLink","")
+            consig["foto_link"]=foto_link
+            print(f"[Consig] Foto subida: {filename}")
+        except Exception as e:
+            print(f"[Consig] Error foto: {e}")
+
+    shopify_gid = ""
+    # 2. Registrar en Sheets
+    try:
+        from pos_sheets import append_consignacion
+        result = append_consignacion(consig)
+    except Exception as e:
+        print(f"[Consig] Sheets error: {e}")
+        result = {}
+
+    return {
+        "success": True,
+        "foto_link": foto_link,
+        "shopify_gid": shopify_gid,
+        "row": result.get("row"),
+    }
+
+
+@app.get("/pos/consignaciones")
+def get_consignaciones():
+    try:
+        from pos_sheets import get_consignaciones
+        consigs = get_consignaciones()
+        activas  = [c for c in consigs if c["estado"] == "Activa"]
+        vendidas = [c for c in consigs if c["estado"] == "Vendida"]
+        return {"activas": activas, "vendidas": vendidas, "total": len(consigs)}
+    except Exception as e:
+        return {"activas":[],"vendidas":[],"total":0,"error":str(e)}
+
+
+@app.patch("/pos/consignacion/{row_index}/vendida")
+async def marcar_vendida(row_index: int, order_name: str = ""):
+    try:
+        from pos_sheets import marcar_consignacion_vendida
+        marcar_consignacion_vendida(row_index, order_name)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+
+@app.get("/pos/consignacion/buscar-match")
+async def buscar_match_shopify(q: str):
+    """Busca productos en Shopify por nombre para linkear con consignación."""
+    query = """
+    query SearchProducts($q: String!) {
+      products(first: 8, query: $q) {
+        edges { node {
+          id title
+          featuredImage { url }
+          variants(first:1) { edges { node { price inventoryQuantity } } }
+        }}
+      }
+    }"""
+    try:
+        data = await gql(query, {"q": q})
+        products = []
+        for e in data["products"]["edges"]:
+            n = e["node"]
+            v = n["variants"]["edges"][0]["node"] if n["variants"]["edges"] else {}
+            products.append({
+                "id":     n["id"],
+                "title":  n["title"],
+                "image":  n["featuredImage"]["url"] if n.get("featuredImage") else None,
+                "price":  float(v.get("price",0)),
+                "stock":  v.get("inventoryQuantity",0),
+            })
+        return {"products": products}
+    except Exception as e:
+        return {"products": [], "error": str(e)}
+
+
+@app.patch("/pos/consignacion/{row_index}/linkear")
+async def linkear_consignacion(row_index: int, shopify_gid: str):
+    """Linkea una consignación con un producto de Shopify."""
+    try:
+        from pos_sheets import get_creds
+        from googleapiclient.discovery import build as sheets_build
+        from pos_sheets import get_or_create_sheet
+        creds  = get_creds()
+        sheets = sheets_build("sheets","v4",credentials=creds)
+        sid    = get_or_create_sheet()
+        sheets.spreadsheets().values().update(
+            spreadsheetId=sid,
+            range=f"📦 Consignaciones!K{row_index}",
+            valueInputOption="RAW",
+            body={"values":[[shopify_gid]]}
+        ).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 # ── Servir el POS frontend ────────────────────────────────────────────────────
 app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")

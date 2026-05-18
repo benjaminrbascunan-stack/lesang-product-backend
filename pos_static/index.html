@@ -703,6 +703,148 @@ nav{
   line-height:1;padding:4px;
 }
 .img-modal-close:hover{opacity:1}
+
+/* ══ CONSIGNACIONES ══ */
+#page-consig{flex-direction:column;overflow-y:auto}
+.consig-toolbar{
+  height:48px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;border-bottom:1px solid var(--gray2);
+  background:var(--white);flex-shrink:0;
+}
+.consig-title{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.new-consig-btn{
+  padding:8px 16px;background:var(--black);color:var(--white);
+  border:none;font-family:var(--font);font-size:10px;font-weight:500;
+  letter-spacing:.15em;text-transform:uppercase;cursor:pointer;
+  transition:var(--transition);
+}
+.new-consig-btn:hover{background:var(--orange)}
+.consig-tabs{display:flex;border-bottom:1px solid var(--gray2);flex-shrink:0}
+.ctab{
+  flex:1;padding:10px;background:transparent;border:none;
+  color:var(--gray4);font-family:var(--font);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  border-bottom:2px solid transparent;transition:var(--transition);
+}
+.ctab.active{color:var(--orange);border-bottom-color:var(--orange)}
+.consig-list{padding:16px;display:flex;flex-direction:column;gap:10px}
+.consig-card{
+  background:var(--white);border:1px solid var(--gray2);
+  padding:14px 16px;display:flex;gap:12px;align-items:flex-start;
+}
+.consig-foto{
+  width:60px;height:80px;object-fit:cover;
+  background:var(--gray1);border:1px solid var(--gray2);flex-shrink:0;cursor:zoom-in;
+}
+.consig-foto-ph{
+  width:60px;height:80px;background:var(--gray1);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.consig-body{flex:1;min-width:0}
+.consig-nombre{font-size:12px;font-weight:600;margin-bottom:4px}
+.consig-dueno{font-size:10px;color:var(--orange);margin-bottom:4px}
+.consig-meta{font-size:9px;color:var(--gray4);letter-spacing:.05em;line-height:1.6}
+.consig-prices{display:flex;gap:16px;margin-top:8px}
+.consig-price{font-size:11px}
+.consig-price span{font-size:14px;font-weight:700}
+.consig-price.venta span{color:var(--text)}
+.consig-price.acordado span{color:var(--orange)}
+.consig-badge-estado{
+  display:inline-block;padding:2px 8px;font-size:8px;
+  letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  margin-bottom:6px;
+}
+.estado-activa{background:#e8f5e9;color:#2d6a4f;border:1px solid #a8d8b0}
+.estado-vendida{background:var(--gray1);color:var(--gray4);border:1px solid var(--gray2)}
+
+/* Formulario nueva consignación */
+.consig-form-overlay{
+  display:none;position:fixed;inset:0;
+  background:var(--white);z-index:600;
+  flex-direction:column;overflow-y:auto;
+}
+.consig-form-overlay.show{display:flex}
+.consig-form-header{
+  padding:14px 16px;border-bottom:1px solid var(--gray2);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:var(--white);z-index:10;flex-shrink:0;
+}
+.consig-form-title{font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.consig-form-body{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.consig-section-label{
+  font-size:8px;font-weight:600;letter-spacing:.25em;
+  text-transform:uppercase;color:var(--gray4);
+  padding-bottom:6px;border-bottom:1px solid var(--gray2);
+  margin-top:4px;
+}
+.consig-foto-btn{
+  width:100%;aspect-ratio:4/3;max-height:200px;
+  border:2px dashed var(--gray3);background:var(--gray1);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;cursor:pointer;color:var(--gray4);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;transition:var(--transition);
+}
+.consig-foto-btn:hover,.consig-foto-btn.has-foto{border-color:var(--orange);color:var(--orange)}
+.consig-foto-preview{width:100%;max-height:200px;object-fit:cover;display:none;border:2px solid var(--orange)}
+.consig-foto-preview.show{display:block}
+.consig-submit-btn{
+  width:100%;padding:14px;background:var(--black);color:var(--white);
+  border:none;font-family:var(--font);font-size:11px;font-weight:500;
+  letter-spacing:.2em;text-transform:uppercase;cursor:pointer;
+  transition:var(--transition);margin-top:8px;
+}
+.consig-submit-btn:hover:not(:disabled){background:var(--orange)}
+.consig-submit-btn:disabled{background:var(--gray2);color:var(--gray4);cursor:not-allowed}
+@media(max-width:768px){
+  .consig-form-overlay{top:var(--nav)}
+}
+
+/* Match modal */
+.match-modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.7);z-index:700;
+  align-items:center;justify-content:center;
+}
+.match-modal.show{display:flex}
+.match-box{
+  background:var(--white);width:min(480px,95vw);
+  max-height:80vh;overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,.2);
+}
+.match-header{
+  padding:16px 20px;border-bottom:1px solid var(--gray2);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:var(--white);
+}
+.match-title{font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+.match-list{padding:12px}
+.match-item{
+  display:flex;gap:10px;padding:10px;
+  border:1px solid var(--gray2);margin-bottom:8px;
+  cursor:pointer;transition:var(--transition);align-items:center;
+}
+.match-item:hover{border-color:var(--orange);background:#fff8f4}
+.match-item.selected{border-color:var(--orange);background:#fff8f4}
+.match-img{width:44px;height:56px;object-fit:cover;background:var(--gray1);flex-shrink:0}
+.match-info{flex:1;min-width:0}
+.match-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match-price{font-size:10px;color:var(--orange);margin-top:2px}
+.match-stock{font-size:9px;color:var(--gray4)}
+.match-check{width:20px;height:20px;border-radius:50%;border:2px solid var(--gray3);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.match-item.selected .match-check{background:var(--orange);border-color:var(--orange);color:white;font-size:12px}
+.match-actions{padding:12px 12px 16px;display:flex;gap:8px;position:sticky;bottom:0;background:var(--white);border-top:1px solid var(--gray2)}
+.match-confirm-btn{flex:1;padding:10px;background:var(--black);color:var(--white);border:none;font-family:var(--font);font-size:10px;font-weight:500;letter-spacing:.15em;text-transform:uppercase;cursor:pointer}
+.match-confirm-btn:hover{background:var(--orange)}
+.match-confirm-btn:disabled{background:var(--gray2);color:var(--gray4);cursor:not-allowed}
+.match-skip-btn{padding:10px 16px;background:none;border:1px solid var(--gray2);color:var(--gray4);font-family:var(--font);font-size:10px;cursor:pointer}
+.match-skip-btn:hover{border-color:var(--text);color:var(--text)}
+.link-shopify-btn{
+  padding:4px 10px;background:none;
+  border:1px solid var(--gray2);color:var(--gray4);
+  font-family:var(--font);font-size:9px;letter-spacing:.1em;
+  cursor:pointer;transition:var(--transition);
+}
+.link-shopify-btn:hover{border-color:var(--orange);color:var(--orange)}
 </style>
 </head>
 <body>
@@ -736,6 +878,10 @@ nav{
     <button class="ntab" onclick="goTo('resumenes',this)">
       <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Resúmenes
+    </button>
+    <button class="ntab" onclick="goTo('consig',this)">
+      <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+      Consignaciones <span class="nbadge" id="consig-badge">0</span>
     </button>
     <button class="ntab" onclick="goTo('config',this)">
       <svg width="11" height="11" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -879,6 +1025,87 @@ nav{
       <button class="sell-btn" id="sell-btn" disabled onclick="registrarVenta()">Registrar venta →</button>
       <button class="clear-btn" onclick="resetForm()">Limpiar formulario</button>
     </div>
+  </div>
+</div>
+
+<!-- PAGE: CONSIGNACIONES -->
+<div class="page" id="page-consig">
+  <div class="consig-toolbar">
+    <span class="consig-title">Consignaciones</span>
+    <button class="new-consig-btn" onclick="abrirFormConsig()">+ Nueva</button>
+  </div>
+  <div class="consig-tabs">
+    <button class="ctab active" onclick="switchConsigTab('activas',this)">Activas <span id="badge-activas">0</span></button>
+    <button class="ctab" onclick="switchConsigTab('vendidas',this)">Vendidas <span id="badge-vendidas">0</span></button>
+  </div>
+  <div class="consig-list" id="consig-list"></div>
+</div>
+
+<!-- Formulario nueva consignación -->
+<div class="consig-form-overlay" id="consig-form-overlay">
+  <div class="consig-form-header">
+    <span class="consig-form-title">Nueva consignación</span>
+    <button class="sel-rm" onclick="cerrarFormConsig()">
+      <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="consig-form-body">
+    <!-- Foto -->
+    <div class="consig-section-label">Foto de la prenda *</div>
+    <input type="file" id="consig-foto-input" accept="image/*" capture="environment" style="display:none" onchange="onConsigFoto(this)">
+    <div class="consig-foto-btn" id="consig-foto-btn" onclick="document.getElementById('consig-foto-input').click()">
+      <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5">
+        <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <span id="consig-foto-label">Tomar foto de la prenda</span>
+    </div>
+    <img id="consig-foto-preview" class="consig-foto-preview" alt="">
+
+    <!-- Producto -->
+    <div class="consig-section-label">Datos del producto</div>
+    <div class="fgrp"><label class="flabel" for="cf-nombre">Nombre prenda *</label>
+      <input class="finput" type="text" id="cf-nombre" placeholder="Ej: Chaqueta Balenciaga"></div>
+    <div class="frow">
+      <div class="fgrp"><label class="flabel" for="cf-talla">Talla</label>
+        <input class="finput" type="text" id="cf-talla" placeholder="S/M/38"></div>
+      <div class="fgrp"><label class="flabel" for="cf-marca">Marca</label>
+        <select class="fsel" id="cf-marca" onchange="onConsigMarcaChange(this)">
+          <option value="Consignacion">Consignación</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgrp" id="cf-marca-nueva-wrap" style="display:none">
+      <label class="flabel" for="cf-marca-nueva">Nombre de la nueva marca</label>
+      <input class="finput" type="text" id="cf-marca-nueva" placeholder="Ej: Supreme">
+    </div>
+    <div class="frow">
+      <div class="fgrp"><label class="flabel" for="cf-precio">Precio venta (CLP) *</label>
+        <div class="price-wrap"><span class="price-pre">$</span>
+        <input class="finput" type="number" id="cf-precio" placeholder="0"></div>
+    <div class="fgrp"><label class="flabel" for="cf-acordado">Valor acordado al dueño (CLP) *</label>
+      <div class="price-wrap"><span class="price-pre">$</span>
+      <input class="finput" type="number" id="cf-acordado" placeholder="0"></div>
+    </div>
+
+    <!-- Dueño -->
+    <div class="consig-section-label">Datos del dueño</div>
+    <div class="fgrp"><label class="flabel" for="cf-dueno">Nombre *</label>
+      <input class="finput" type="text" id="cf-dueno" placeholder="Nombre completo"></div>
+    <div class="frow">
+      <div class="fgrp"><label class="flabel" for="cf-ig">Instagram</label>
+        <input class="finput" type="text" id="cf-ig" placeholder="@usuario"></div>
+      <div class="fgrp"><label class="flabel" for="cf-tel">Teléfono</label>
+        <input class="finput" type="tel" id="cf-tel" placeholder="+56 9..."></div>
+    </div>
+    <div class="fgrp"><label class="flabel" for="cf-email">Email</label>
+      <input class="finput" type="email" id="cf-email" placeholder="correo@email.com"></div>
+    <div class="fgrp"><label class="flabel" for="cf-notas">Notas</label>
+      <input class="finput" type="text" id="cf-notas" placeholder="Ej: traer a buscar si no se vende en 2 meses"></div>
+
+    <button class="consig-submit-btn" id="consig-submit-btn" onclick="registrarConsignacion()">
+      Registrar consignación →
+    </button>
   </div>
 </div>
 
@@ -1053,11 +1280,12 @@ const API = window.location.origin;
 
 
 // ── IMAGE PREVIEW MODAL ────────────────────────────────────────────────────
-function openImgModal(url) {
+function openImgModal(urlOrEl) {
   var modal = document.getElementById('img-modal');
   var img   = document.getElementById('img-modal-src');
-  if(!modal || !img || !url) return;
-  // Cargar imagen en máxima calidad (sin el _200x200)
+  if(!modal || !img) return;
+  var url = typeof urlOrEl === 'string' ? urlOrEl : urlOrEl.src;
+  if(!url) return;
   img.src = url;
   modal.classList.add('show');
 }
@@ -1140,6 +1368,7 @@ async function init(){
   await loadHistorial(MES);
   setLoad(90,'Conectando Google Sheets...');
   await loadSheetUrl();
+  await loadConsignaciones();
   setLoad(100,'Listo');
   setTimeout(function(){
     document.getElementById('loading').classList.add('out');
@@ -1827,6 +2056,7 @@ function goTo(name,btn){
   if(name==='hist'){buildMesTabs();renderHistorial();}
   if(name==='config') renderConfigPage();
   if(name==='resumenes') initResumenes();
+  if(name==='consig') loadConsignaciones();
   // FAB solo visible en POS
   var fab=document.getElementById('sheet-fab');
   if(fab) fab.style.display = (name==='pos' && isMobile()) ? 'flex' : 'none';
@@ -2104,6 +2334,260 @@ function resetFoto() {
   document.getElementById('foto-label').textContent = 'Agregar foto de la venta';
 }
 
+
+
+// ── MATCH CONSIGNACION ────────────────────────────────────────────────────────
+var _matchRowIndex = null;
+var _matchSelected = null;
+
+async function buscarMatchConsignacion(rowIndex, nombre){
+  _matchRowIndex = rowIndex;
+  _matchSelected = null;
+  document.getElementById('match-confirm-btn').disabled = true;
+  document.getElementById('match-list').innerHTML =
+    '<div style="padding:20px;text-align:center;font-size:10px;color:var(--gray4)">Buscando en Shopify...</div>';
+  document.getElementById('match-modal').classList.add('show');
+
+  try{
+    // Usar las primeras 2-3 palabras para buscar
+    var words = nombre.split(' ').slice(0,3).join(' ');
+    var r = await fetch(API+'/pos/consignacion/buscar-match?q='+encodeURIComponent(words));
+    var d = await r.json();
+
+    if(!d.products || !d.products.length){
+      document.getElementById('match-list').innerHTML =
+        '<div style="padding:20px;text-align:center;font-size:10px;color:var(--gray4)">No se encontraron productos similares</div>';
+      return;
+    }
+
+    document.getElementById('match-list').innerHTML = d.products.map(function(p){
+      var img = p.image
+        ? '<img class="match-img" src="'+shopifyThumb(p.image,'100x100')+'">'
+        : '<div class="match-img"></div>';
+      return '<div class="match-item" data-gid="'+p.id+'" onclick="selectMatch(this)">'
+        +img
+        +'<div class="match-info">'
+        +'<div class="match-name">'+esc(p.title)+'</div>'
+        +'<div class="match-price">$'+fmt(p.price)+' CLP</div>'
+        +'<div class="match-stock">Stock: '+(p.stock||0)+'</div>'
+        +'</div>'
+        +'<div class="match-check"></div>'
+        +'</div>';
+    }).join('');
+  }catch(e){
+    document.getElementById('match-list').innerHTML =
+      '<div style="padding:20px;text-align:center;font-size:10px;color:#cc3300">Error: '+e.message+'</div>';
+  }
+}
+
+function handleLinkBtn(btn){
+  var row = parseInt(btn.getAttribute('data-row'));
+  var nombre = btn.getAttribute('data-nombre');
+  buscarMatchConsignacion(row, nombre);
+}
+
+function selectMatch(el){
+  document.querySelectorAll('.match-item').forEach(function(i){
+    i.classList.remove('selected');
+    i.querySelector('.match-check').textContent='';
+  });
+  el.classList.add('selected');
+  el.querySelector('.match-check').textContent='✓';
+  _matchSelected = el.getAttribute('data-gid');
+  document.getElementById('match-confirm-btn').disabled = false;
+}
+
+async function confirmarMatch(){
+  if(!_matchSelected || !_matchRowIndex) return;
+  var btn = document.getElementById('match-confirm-btn');
+  btn.textContent='Guardando...';btn.disabled=true;
+  try{
+    var r = await fetch(API+'/pos/consignacion/'+_matchRowIndex+'/linkear?shopify_gid='+encodeURIComponent(_matchSelected),{method:'PATCH'});
+    if(!r.ok) throw new Error('Error al linkear');
+    toast('Consignación linkeada con Shopify ✓','ok');
+    cerrarMatchModal();
+    await loadConsignaciones();
+  }catch(e){
+    toast(e.message,'err');
+    btn.textContent='Confirmar link →';btn.disabled=false;
+  }
+}
+
+function cerrarMatchModal(){
+  document.getElementById('match-modal').classList.remove('show');
+  _matchRowIndex=null;_matchSelected=null;
+}
+
+// ── CONSIGNACIONES ────────────────────────────────────────────────────────────
+var consigData = {activas:[], vendidas:[]};
+var consigFotoFile = null;
+var consigTabActual = 'activas';
+
+function abrirFormConsig(){
+  // Populate marca select from CFG
+  var sel = document.getElementById('cf-marca');
+  sel.innerHTML = '';
+  var marcas = (CFG.marcas||[]).map(function(m){return m.nombre;});
+  // Always include Consignacion first
+  if(marcas.indexOf('Consignacion')===-1) marcas.unshift('Consignacion');
+  marcas.forEach(function(m){
+    var opt=document.createElement('option');
+    opt.value=m; opt.textContent=m;
+    if(m==='Consignacion') opt.selected=true;
+    sel.appendChild(opt);
+  });
+  // Add "Nueva marca..." at end
+  var newOpt=document.createElement('option');
+  newOpt.value='__nueva__'; newOpt.textContent='+ Nueva marca...';
+  sel.appendChild(newOpt);
+  document.getElementById('consig-form-overlay').classList.add('show');
+}
+
+function onConsigMarcaChange(sel){
+  var wrap=document.getElementById('cf-marca-nueva-wrap');
+  if(sel.value==='__nueva__'){
+    wrap.style.display='block';
+    document.getElementById('cf-marca-nueva').focus();
+  } else {
+    wrap.style.display='none';
+  }
+}
+function cerrarFormConsig(){
+  document.getElementById('consig-form-overlay').classList.remove('show');
+}
+
+function onConsigFoto(input){
+  var file = input.files[0];
+  if(!file) return;
+  consigFotoFile = file;
+  var url = URL.createObjectURL(file);
+  var preview = document.getElementById('consig-foto-preview');
+  preview.src = url;
+  preview.classList.add('show');
+  document.getElementById('consig-foto-btn').classList.add('has-foto');
+  document.getElementById('consig-foto-label').textContent = '✓ Foto lista — toca para cambiar';
+}
+
+async function registrarConsignacion(){
+  var nombre   = document.getElementById('cf-nombre').value.trim();
+  var precio   = parseFloat(document.getElementById('cf-precio').value)||0;
+  var acordado = parseFloat(document.getElementById('cf-acordado').value)||0;
+  var dueno    = document.getElementById('cf-dueno').value.trim();
+
+  if(!nombre){toast('Ingresa el nombre de la prenda','err');return;}
+  if(!precio){toast('Ingresa el precio de venta','err');return;}
+  if(!acordado){toast('Ingresa el valor acordado','err');return;}
+  if(!dueno){toast('Ingresa el nombre del dueño','err');return;}
+  if(!consigFotoFile){toast('La foto es obligatoria','err');return;}
+
+  var btn = document.getElementById('consig-submit-btn');
+  btn.textContent='Registrando...';btn.disabled=true;
+
+  try{
+    var fd = new FormData();
+    if(consigFotoFile) fd.append('foto', consigFotoFile);
+    fd.append('nombre_prenda', nombre);
+    var marcaVal = document.getElementById('cf-marca').value;
+    if(marcaVal==='__nueva__'){
+      var nuevaMarca=document.getElementById('cf-marca-nueva').value.trim();
+      if(!nuevaMarca){toast('Ingresa el nombre de la nueva marca','err');btn.textContent='Registrar consignación →';btn.disabled=false;return;}
+      marcaVal=nuevaMarca;
+      // Agregar al config
+      await patchConfig({marcas:[...CFG.marcas,{nombre:nuevaMarca,comision:0.25,paga_iva:false}]});
+    }
+    fd.append('marca', marcaVal);
+    fd.append('talla', document.getElementById('cf-talla').value);
+    fd.append('precio_venta', String(precio));
+    fd.append('valor_acordado', String(acordado));
+    fd.append('dueno', dueno);
+    fd.append('instagram', document.getElementById('cf-ig').value);
+    fd.append('email', document.getElementById('cf-email').value);
+    fd.append('telefono', document.getElementById('cf-tel').value);
+    fd.append('notas', document.getElementById('cf-notas').value);
+
+    var r = await fetch(API+'/pos/consignacion', {method:'POST', body:fd});
+    var d = await r.json();
+    if(!r.ok) throw new Error(d.detail||'Error');
+
+    toast('Consignación registrada en Shopify y Sheets ✓','ok');
+    cerrarFormConsig();
+    // Limpiar form
+    ['cf-nombre','cf-talla','cf-precio','cf-acordado','cf-dueno','cf-ig','cf-email','cf-tel','cf-notas','cf-marca-nueva']
+      .forEach(function(id){document.getElementById(id).value='';});
+    consigFotoFile=null;
+    document.getElementById('consig-foto-preview').classList.remove('show');
+    document.getElementById('consig-foto-btn').classList.remove('has-foto');
+    document.getElementById('consig-foto-label').textContent='Tomar foto de la prenda';
+    // Recargar lista
+    await loadConsignaciones();
+
+  }catch(e){
+    toast(e.message||'Error al registrar','err');
+  }
+  btn.textContent='Registrar consignación →';btn.disabled=false;
+}
+
+async function loadConsignaciones(){
+  try{
+    var r=await fetch(API+'/pos/consignaciones');
+    var d=await r.json();
+    consigData=d;
+    document.getElementById('consig-badge').textContent=d.activas.length;
+    document.getElementById('badge-activas').textContent=d.activas.length;
+    document.getElementById('badge-vendidas').textContent=d.vendidas.length;
+    renderConsignaciones();
+  }catch(e){
+    console.warn('Error cargando consignaciones:',e);
+  }
+}
+
+function switchConsigTab(tab, btn){
+  document.querySelectorAll('.ctab').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  consigTabActual=tab;
+  renderConsignaciones();
+}
+
+function renderConsignaciones(){
+  var list = consigTabActual==='activas' ? consigData.activas : consigData.vendidas;
+  var container = document.getElementById('consig-list');
+
+  if(!list.length){
+    container.innerHTML='<div class="empty-state"><div class="empty-txt">'
+      +(consigTabActual==='activas'?'Sin consignaciones activas':'Sin consignaciones vendidas')
+      +'</div></div>';
+    return;
+  }
+
+  container.innerHTML = list.map(function(c){
+    var foto = c.foto_link
+      ? '<img class="consig-foto" src="'+c.foto_link+'" onclick="openImgModal(this.src)">'
+      : '<div class="consig-foto-ph"><svg width="20" height="20" viewBox="0 0 24 24" stroke="var(--gray3)" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
+    var estadoCls = c.estado==='Activa'?'estado-activa':'estado-vendida';
+    var ganancia = c.precio_venta - c.valor_acordado;
+
+    return '<div class="consig-card">'
+      +foto
+      +'<div class="consig-body">'
+      +'<span class="consig-badge-estado '+estadoCls+'">'+c.estado+'</span>'
+      +'<div class="consig-nombre">'+esc(c.nombre_prenda)+(c.talla?' <span style="color:var(--gray4);font-weight:400;font-size:10px">'+c.talla+'</span>':'')+'</div>'
+      +'<div class="consig-dueno">'+esc(c.dueno)+(c.instagram?' · '+esc(c.instagram):'')+'</div>'
+      +'<div class="consig-meta">'
+      +(c.telefono?'📞 '+esc(c.telefono)+'<br>':'')
+      +(c.email?'✉ '+esc(c.email)+'<br>':'')
+      +'Ingreso: '+esc(c.fecha_ingreso)
+      +(c.fecha_venta?'<br>Vendido: '+esc(c.fecha_venta):'')
+      +(c.notas?'<br><em>'+esc(c.notas)+'</em>':'')
+      +'</div>'
+      +'<div class="consig-prices">'
+      +'<div class="consig-price venta"><div style="font-size:8px;color:var(--gray4);letter-spacing:.1em">PRECIO VENTA</div><span>$'+fmt(c.precio_venta)+'</span></div>'
+      +'<div class="consig-price acordado"><div style="font-size:8px;color:var(--gray4);letter-spacing:.1em">PAGAR DUEÑO</div><span>$'+fmt(c.valor_acordado)+'</span></div>'
+      +'<div class="consig-price"><div style="font-size:8px;color:var(--gray4);letter-spacing:.1em">GANANCIA</div><span style="color:var(--success)">$'+fmt(ganancia)+'</span></div>'
+      +'</div>'
+      +'</div></div>';
+  }).join('');
+}
+
 init();
 
 // ── SERVICE WORKER (PWA) ─────────────────────────────────────────────────────
@@ -2159,6 +2643,28 @@ setInterval(async () => {
 <div class="img-modal" id="img-modal" onclick="closeImgModal()">
   <button class="img-modal-close" onclick="closeImgModal()">×</button>
   <img id="img-modal-src" src="" alt="">
+</div>
+
+<!-- Match modal -->
+<div class="match-modal" id="match-modal">
+  <div class="match-box">
+    <div class="match-header">
+      <span class="match-title">Linkear con producto Shopify</span>
+      <button class="sel-rm" onclick="cerrarMatchModal()">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div style="padding:10px 12px 0;font-size:10px;color:var(--gray4)">
+      Selecciona el producto de Shopify que corresponde a esta consignación:
+    </div>
+    <div class="match-list" id="match-list"></div>
+    <div class="match-actions">
+      <button class="match-confirm-btn" id="match-confirm-btn" disabled onclick="confirmarMatch()">
+        Confirmar link →
+      </button>
+      <button class="match-skip-btn" onclick="cerrarMatchModal()">Sin link</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
