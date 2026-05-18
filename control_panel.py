@@ -789,6 +789,75 @@ async def crear_stock_marca(
         raise HTTPException(500, str(e))
 
 
+@app.patch("/pos/stock-marcas/{row_index}")
+async def actualizar_stock_marca(row_index: int, body: dict):
+    try:
+        from pos_sheets import get_creds, get_or_create_sheet
+        from googleapiclient.discovery import build as sbuild
+        import json as _json
+        creds  = get_creds()
+        sheets = sbuild("sheets","v4",credentials=creds)
+        sid    = get_or_create_sheet()
+        tallas = body.get("tallas",{})
+        TALLAS = ["XXS","XS","S","M","L","XL","XXL"]
+        total  = sum(int(tallas.get(t,0) or 0) for t in TALLAS)
+        row = [
+            body.get("nombre_prenda",""),
+            body.get("marca",""),
+            float(body.get("precio_venta",0)),
+            "",  # keep existing foto
+            int(tallas.get("XXS",0) or 0),
+            int(tallas.get("XS",0) or 0),
+            int(tallas.get("S",0) or 0),
+            int(tallas.get("M",0) or 0),
+            int(tallas.get("L",0) or 0),
+            int(tallas.get("XL",0) or 0),
+            int(tallas.get("XXL",0) or 0),
+            total,
+        ]
+        # Update cols A-L (keep M-N: fecha and notas)
+        sheets.spreadsheets().values().update(
+            spreadsheetId=sid,
+            range=f"📦 Stock Marcas!A{row_index}:L{row_index}",
+            valueInputOption="RAW",
+            body={"values":[row]},
+        ).execute()
+        # Update notas if provided
+        if "notas" in body:
+            sheets.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f"📦 Stock Marcas!N{row_index}",
+                valueInputOption="RAW",
+                body={"values":[[body["notas"]]]},
+            ).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/pos/stock-marcas/{row_index}")
+async def eliminar_stock_marca(row_index: int):
+    try:
+        from pos_sheets import get_creds, get_or_create_sheet
+        from googleapiclient.discovery import build as sbuild
+        creds  = get_creds()
+        sheets = sbuild("sheets","v4",credentials=creds)
+        sid    = get_or_create_sheet()
+        meta   = sheets.spreadsheets().get(spreadsheetId=sid).execute()
+        gid    = next(s["properties"]["sheetId"] for s in meta["sheets"]
+                      if s["properties"]["title"] == "📦 Stock Marcas")
+        sheets.spreadsheets().batchUpdate(
+            spreadsheetId=sid,
+            body={"requests":[{"deleteDimension":{
+                "range":{"sheetId":gid,"dimension":"ROWS",
+                         "startIndex":row_index-1,"endIndex":row_index}
+            }}]}
+        ).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @app.post("/pos/stock-marcas/{row_index}/vender")
 async def vender_stock_marca(row_index: int, venta: VentaIn):
     """Vende un item del stock interno: descuenta talla y registra venta."""

@@ -928,6 +928,18 @@ nav{
 .stock-talla-btn:hover:not(:disabled){border-color:var(--orange);color:var(--orange)}
 .stock-talla-btn.sel{background:var(--black);color:var(--white);border-color:var(--black)}
 .stock-talla-btn:disabled{opacity:.3;cursor:not-allowed;text-decoration:line-through}
+.stock-edit-btn{
+  flex:1;padding:4px;background:none;border:1px solid var(--gray2);
+  color:var(--gray4);font-family:var(--font);font-size:9px;
+  letter-spacing:.1em;cursor:pointer;transition:var(--transition);
+}
+.stock-edit-btn:hover{border-color:var(--text);color:var(--text)}
+.stock-del-btn{
+  padding:4px 8px;background:none;border:1px solid var(--gray2);
+  color:var(--gray4);font-family:var(--font);font-size:9px;
+  cursor:pointer;transition:var(--transition);
+}
+.stock-del-btn:hover{border-color:#cc3300;color:#cc3300}
 @media(max-width:768px){
   .stock-grid{grid-template-columns:repeat(2,1fr);gap:8px;padding:10px}
   .talla-selector{grid-template-columns:repeat(4,1fr)}
@@ -2722,6 +2734,74 @@ async function registrarStockMarca(){
   btn.textContent='Registrar entrada →'; btn.disabled=false;
 }
 
+async function editarStockItem(rowIndex){
+  var item = stockData.find(function(i){return i.row_index===rowIndex;});
+  if(!item) return;
+  // Open form pre-filled
+  abrirFormStock();
+  setTimeout(function(){
+    document.getElementById('sf-nombre').value = item.nombre_prenda;
+    document.getElementById('sf-precio').value = item.precio_venta;
+    document.getElementById('sf-notas').value = item.notas||'';
+    // Set marca
+    var sel = document.getElementById('sf-marca');
+    for(var i=0;i<sel.options.length;i++){
+      if(sel.options[i].value===item.marca){ sel.selectedIndex=i; break; }
+    }
+    // Set tallas
+    var TALLAS_LIST = ['XXS','XS','S','M','L','XL','XXL'];
+    TALLAS_LIST.forEach(function(t){
+      var el = document.getElementById('st-'+t);
+      if(el) el.value = item.tallas[t]||0;
+    });
+    // Change submit to update
+    var btn = document.getElementById('sf-submit-btn');
+    btn.textContent = 'Guardar cambios →';
+    btn.onclick = function(){ actualizarStockItem(rowIndex); };
+  }, 100);
+}
+
+async function actualizarStockItem(rowIndex){
+  var nombre = document.getElementById('sf-nombre').value.trim();
+  var marcaVal = document.getElementById('sf-marca').value;
+  var precio = parseFloat(document.getElementById('sf-precio').value)||0;
+  if(!nombre||!marcaVal||!precio){toast('Completa los campos obligatorios','err');return;}
+  var tallas = {};
+  ['XXS','XS','S','M','L','XL','XXL'].forEach(function(t){
+    tallas[t] = parseInt(document.getElementById('st-'+t).value)||0;
+  });
+  var btn = document.getElementById('sf-submit-btn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  try{
+    var r = await fetch(API+'/pos/stock-marcas/'+rowIndex, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({nombre_prenda:nombre,marca:marcaVal,precio_venta:precio,
+        tallas:tallas,notas:document.getElementById('sf-notas').value})
+    });
+    if(!r.ok) throw new Error('Error al actualizar');
+    toast('Stock actualizado ✓','ok');
+    cerrarFormStock();
+    await loadStockMarcas();
+  }catch(e){
+    toast(e.message,'err');
+  }
+  btn.textContent='Registrar entrada →'; btn.disabled=false;
+  btn.onclick = registrarStockMarca;
+}
+
+async function eliminarStockItem(rowIndex, nombre){
+  if(!confirm('¿Eliminar "'+nombre+'" del stock?')) return;
+  try{
+    var r = await fetch(API+'/pos/stock-marcas/'+rowIndex, {method:'DELETE'});
+    if(!r.ok) throw new Error('Error al eliminar');
+    toast('Item eliminado','ok');
+    await loadStockMarcas();
+  }catch(e){
+    toast(e.message,'err');
+  }
+}
+
 async function loadStockMarcas(){
   try{
     var r=await fetch(API+'/pos/stock-marcas');
@@ -2761,6 +2841,10 @@ function renderStockMarcas(){
         +'<div class="stock-card-marca">'+esc(item.marca)+'</div>'
         +'<div class="stock-card-price">$'+fmt(item.precio_venta)+'</div>'
         +'<div class="stock-tallas">'+tallas+'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:8px">'
+        +'<div style="display:flex;gap:6px;margin-top:8px">'
+        +'<button class="stock-edit-btn" data-row="'+item.row_index+'" onclick="event.stopPropagation();editarStockItem('+item.row_index+')">Editar</button>'
+        +'<button class="stock-del-btn" data-row="'+item.row_index+'" data-nombre="'+esc(item.nombre_prenda)+'" onclick="event.stopPropagation();eliminarStockItem('+item.row_index+',this.getAttribute(\"data-nombre\"))">✕</button>'
         +'</div></div>';
     }).join('')
     +'</div>';
