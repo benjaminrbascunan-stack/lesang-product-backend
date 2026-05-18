@@ -2834,7 +2834,6 @@ function renderStockMarcas(){
         var qty=item.tallas[t]||0;
         return '<span class="talla-badge '+(qty>0?'disponible':'agotada')+'">'+t+(qty>0?' '+qty:'')+'</span>';
       }).join('');
-      return '<div class="stock-card" onclick="abrirStockVenta('+item.row_index+')">'
       return '<div class="stock-card">'
         +'<div onclick="abrirStockVenta('+item.row_index+')" style="cursor:pointer">'
         +img
@@ -2850,8 +2849,9 @@ function renderStockMarcas(){
         +'<button class="stock-del-btn" data-nombre="'+esc(item.nombre_prenda)+'" onclick="eliminarStockItem('+item.row_index+',this.getAttribute(\"data-nombre\"))">✕ Eliminar</button>'
         +'</div>'
         +'</div>';
-    +'</div>';
+    }).join('')+'</div>';
 }
+
 
 function abrirStockVenta(rowIndex){
   var item=stockData.find(function(i){return i.row_index===rowIndex;});
