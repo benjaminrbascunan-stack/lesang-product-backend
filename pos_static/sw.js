@@ -1,6 +1,6 @@
 // Lé Sang POS — Service Worker
 // Versión del cache — incrementar para forzar actualización
-var CACHE_VERSION = 'lesang-pos-v2';
+var CACHE_VERSION = 'lesang-pos-v3';
 var STATIC_CACHE  = CACHE_VERSION + '-static';
 var PRODUCTS_CACHE = CACHE_VERSION + '-products';
 
