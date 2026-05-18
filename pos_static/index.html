@@ -1210,7 +1210,7 @@ nav{
       <div class="consig-section-label" style="margin-bottom:8px">Vendedor</div>
       <select class="fsel" id="sv-vend" style="width:100%;margin-bottom:10px"></select>
       <div class="consig-section-label" style="margin-bottom:8px">Tipo de pago</div>
-      <select class="fsel" id="sv-pago" style="width:100%;margin-bottom:16px">
+      <select class="fsel" id="sv-pago" style="width:100%;margin-bottom:16px" onchange="if(stockSelectedTalla)selStockTalla({getAttribute:function(){return stockSelectedTalla}})">
         <option>Transferencia</option><option>Efectivo</option>
         <option>Débito</option><option>Crédito</option>
       </select>
@@ -1750,6 +1750,14 @@ function loadMoreMobile(){
   }
 
   grid.appendChild(frag);
+}
+
+function driveThumb(url){
+  if(!url) return null;
+  // Convert Drive webViewLink to direct thumbnail
+  var match = url.match(/\/file\/d\/([^\/]+)\//);
+  if(match) return 'https://drive.google.com/thumbnail?id='+match[1]+'&sz=w400';
+  return url;
 }
 
 function shopifyThumb(url, size){
@@ -2740,7 +2748,7 @@ function renderStockMarcas(){
   container.innerHTML='<div class="stock-grid">'+
     stockData.map(function(item){
       var img=item.foto_link
-        ?'<img class="stock-card-img" src="'+item.foto_link+'" loading="lazy">'
+        ?'<img class="stock-card-img" src="'+(driveThumb(item.foto_link)||item.foto_link)+'" loading="lazy">'
         :'<div class="stock-card-img-ph"><svg width="24" height="24" viewBox="0 0 24 24" stroke="var(--gray3)" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
       var tallas=TALLAS.map(function(t){
         var qty=item.tallas[t]||0;
@@ -2773,7 +2781,9 @@ function abrirStockVenta(rowIndex){
   // Tallas disponibles
   var tallasHtml=TALLAS.map(function(t){
     var qty=item.tallas[t]||0;
-    return '<button class="stock-talla-btn" '+(qty<=0?'disabled ':'')+'data-talla="'+t+'" onclick="selStockTalla(this)" id="svt-'+t+'">';
+    return '<button class="stock-talla-btn" '+(qty<=0?'disabled ':'')+'data-talla="'+t+'" onclick="selStockTalla(this)" id="svt-'+t+'">'
+      +t+(qty>0?' ('+qty+')':'')
+      +'</button>';
       +t+(qty>0?' ('+qty+')':'')+'</button>';
   }).join('');
   document.getElementById('sv-tallas').innerHTML=tallasHtml;
