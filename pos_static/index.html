@@ -1826,10 +1826,10 @@ function calcular(precio,pago,vendedor,marca){
   const pctB=(CFG.com_bancaria||{})[pago]||0;
   const comB=precio*pctB;
   const esExt=(CFG.vendedores_externos||[]).includes(vendedor);
-  // Comisión solo aplica en Tienda y Consignación, NO en marcas externas
+  // Comision vendedora SOLO en Tienda y Consignacion
   const marcaEl=document.getElementById('f-marca');const marcaActual=marca||(marcaEl?marcaEl.value:'')||'Tienda';
-  const marcaSinCom=MARCAS_SIN_COMISION_VEND.includes(marcaActual);
-  const pctV=(esExt&&!marcaSinCom)?(CFG.com_externo_pct||0.05):0;
+  const marcaConComision=['Tienda','Consignacion'].includes(marcaActual);
+  const pctV=(esExt&&marcaConComision)?(CFG.com_externo_pct||0.05):0;
   const comV=precio*pctV;
   return{precio,iva,pctB,comB,pctV,comV,neto:precio-iva-comB-comV};
 }
