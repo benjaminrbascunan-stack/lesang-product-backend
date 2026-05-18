@@ -794,10 +794,22 @@ async def actualizar_stock_marca(row_index: int, body: dict):
     try:
         from pos_sheets import get_creds, get_or_create_sheet
         from googleapiclient.discovery import build as sbuild
-        import json as _json
         creds  = get_creds()
         sheets = sbuild("sheets","v4",credentials=creds)
         sid    = get_or_create_sheet()
+
+        # Leer foto existente para no perderla
+        existing = sheets.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range=f"📦 Stock Marcas!D{row_index}",
+            valueRenderOption="UNFORMATTED_VALUE",
+        ).execute()
+        foto_link = ""
+        try:
+            foto_link = existing["values"][0][0]
+        except Exception:
+            pass
+
         tallas = body.get("tallas",{})
         TALLAS = ["XXS","XS","S","M","L","XL","XXL"]
         total  = sum(int(tallas.get(t,0) or 0) for t in TALLAS)
@@ -805,7 +817,7 @@ async def actualizar_stock_marca(row_index: int, body: dict):
             body.get("nombre_prenda",""),
             body.get("marca",""),
             float(body.get("precio_venta",0)),
-            "",  # keep existing foto
+            foto_link,  # preservar foto existente
             int(tallas.get("XXS",0) or 0),
             int(tallas.get("XS",0) or 0),
             int(tallas.get("S",0) or 0),
@@ -815,14 +827,13 @@ async def actualizar_stock_marca(row_index: int, body: dict):
             int(tallas.get("XXL",0) or 0),
             total,
         ]
-        # Update cols A-L (keep M-N: fecha and notas)
+        # Update cols A-L (keep M-N: fecha y notas)
         sheets.spreadsheets().values().update(
             spreadsheetId=sid,
             range=f"📦 Stock Marcas!A{row_index}:L{row_index}",
             valueInputOption="RAW",
             body={"values":[row]},
         ).execute()
-        # Update notas if provided
         if "notas" in body:
             sheets.spreadsheets().values().update(
                 spreadsheetId=sid,
