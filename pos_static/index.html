@@ -2791,11 +2791,11 @@ async function actualizarStockItem(rowIndex){
 }
 
 async function eliminarStockItem(rowIndex, nombre){
-  if(!confirm('¿Eliminar "'+nombre+'" del stock?')) return;
+  if(!confirm('¿Eliminar "'+nombre+'" del stock?\n\nEsta acción no se puede deshacer.')) return;
   try{
     var r = await fetch(API+'/pos/stock-marcas/'+rowIndex, {method:'DELETE'});
     if(!r.ok) throw new Error('Error al eliminar');
-    toast('Item eliminado','ok');
+    toast('"'+nombre+'" eliminado del stock','ok');
     await loadStockMarcas();
   }catch(e){
     toast(e.message,'err');
@@ -2835,18 +2835,21 @@ function renderStockMarcas(){
         return '<span class="talla-badge '+(qty>0?'disponible':'agotada')+'">'+t+(qty>0?' '+qty:'')+'</span>';
       }).join('');
       return '<div class="stock-card" onclick="abrirStockVenta('+item.row_index+')">'
+      return '<div class="stock-card">'
+        +'<div onclick="abrirStockVenta('+item.row_index+')" style="cursor:pointer">'
         +img
         +'<div class="stock-card-body">'
         +'<div class="stock-card-name">'+esc(item.nombre_prenda)+'</div>'
         +'<div class="stock-card-marca">'+esc(item.marca)+'</div>'
         +'<div class="stock-card-price">$'+fmt(item.precio_venta)+'</div>'
         +'<div class="stock-tallas">'+tallas+'</div>'
-        +'<div style="display:flex;gap:6px;margin-top:8px">'
-        +'<div style="display:flex;gap:6px;margin-top:8px">'
-        +'<button class="stock-edit-btn" data-row="'+item.row_index+'" onclick="event.stopPropagation();editarStockItem('+item.row_index+')">Editar</button>'
-        +'<button class="stock-del-btn" data-row="'+item.row_index+'" data-nombre="'+esc(item.nombre_prenda)+'" onclick="event.stopPropagation();eliminarStockItem('+item.row_index+',this.getAttribute(\"data-nombre\"))">✕</button>'
-        +'</div></div>';
-    }).join('')
+        +'</div>'
+        +'</div>'
+        +'<div style="display:flex;gap:6px;padding:8px 12px 10px">'
+        +'<button class="stock-edit-btn" onclick="editarStockItem('+item.row_index+')">Editar</button>'
+        +'<button class="stock-del-btn" data-nombre="'+esc(item.nombre_prenda)+'" onclick="eliminarStockItem('+item.row_index+',this.getAttribute(\"data-nombre\"))">✕ Eliminar</button>'
+        +'</div>'
+        +'</div>';
     +'</div>';
 }
 
