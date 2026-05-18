@@ -2049,15 +2049,21 @@ function openGoogleSheet(){
 
 // ── Nav
 function goTo(name,btn){
-  document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('.page').forEach(function(p){
+    p.classList.remove('active');
+    p.style.display='none';
+  });
   btn.classList.add('active');
-  document.getElementById('page-'+name).classList.add('active');
+  var page = document.getElementById('page-'+name);
+  page.classList.add('active');
+  page.style.display='flex';
+  page.style.width='100%';
+  page.style.height='calc(100vh - '+getComputedStyle(document.documentElement).getPropertyValue('--nav')+')';
   if(name==='hist'){buildMesTabs();renderHistorial();}
   if(name==='config') renderConfigPage();
   if(name==='resumenes') initResumenes();
   if(name==='consig') loadConsignaciones();
-  // FAB solo visible en POS
   var fab=document.getElementById('sheet-fab');
   if(fab) fab.style.display = (name==='pos' && isMobile()) ? 'flex' : 'none';
 }
