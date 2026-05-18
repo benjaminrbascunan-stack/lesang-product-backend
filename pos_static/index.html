@@ -2590,25 +2590,13 @@ function renderConsignaciones(){
 
 init();
 
-// ── SERVICE WORKER (PWA) ─────────────────────────────────────────────────────
+// ── SERVICE WORKER (PWA) — deshabilitado temporalmente ──────────────────────
+// El SW requiere configuración especial de scope en Railway
+// Usando cache localStorage en su lugar
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/pos/static/sw.js', {scope: '/pos/'})
-      .then(function(reg) {
-        console.log('[PWA] Service Worker registrado:', reg.scope);
-        // Escuchar actualizaciones
-        reg.onupdatefound = function() {
-          var newWorker = reg.installing;
-          newWorker.onstatechange = function() {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              toast('Nueva versión disponible — recarga para actualizar', '');
-            }
-          };
-        };
-      })
-      .catch(function(err) {
-        console.log('[PWA] SW error:', err);
-      });
+  // Desregistrar cualquier SW previo que pueda estar bloqueando
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    registrations.forEach(function(reg) { reg.unregister(); });
   });
 }
 
