@@ -505,10 +505,6 @@ def get_ventas_mes(mes: str) -> list:
     ).execute()
 
     all_rows = result.get("values", [])
-    print(f"[Sheets] {mes}: {len(all_rows)} filas totales")
-    for i, r in enumerate(all_rows[:5]):
-        print(f"  Fila {i+1}: {str(r[:3])[:80]}")
-    
     # Datos empiezan en fila 3 (index 2)
     rows  = all_rows[2:] if len(all_rows) > 2 else []
     ventas = []

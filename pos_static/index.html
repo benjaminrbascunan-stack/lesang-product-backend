@@ -1564,8 +1564,7 @@ async function init(){
   await loadHistorial(MES);
   setLoad(90,'Conectando Google Sheets...');
   await loadSheetUrl();
-  await loadConsignaciones();
-  await loadStockMarcas();
+  // consignaciones y stock cargan lazy al abrir la pestaña
   setLoad(100,'Listo');
   setTimeout(function(){
     document.getElementById('loading').classList.add('out');
@@ -2610,8 +2609,7 @@ async function confirmarMatch(){
     if(!r.ok) throw new Error('Error al linkear');
     toast('Consignación linkeada con Shopify ✓','ok');
     cerrarMatchModal();
-    await loadConsignaciones();
-  await loadStockMarcas();
+    // consignaciones y stock cargan lazy al abrir la pestaña
   }catch(e){
     toast(e.message,'err');
     btn.textContent='Confirmar link →';btn.disabled=false;
@@ -2961,8 +2959,7 @@ async function registrarConsignacion(){
     document.getElementById('consig-foto-btn').classList.remove('has-foto');
     document.getElementById('consig-foto-label').textContent='Tomar foto de la prenda';
     // Recargar lista
-    await loadConsignaciones();
-  await loadStockMarcas();
+    // consignaciones y stock cargan lazy al abrir la pestaña
 
   }catch(e){
     toast(e.message||'Error al registrar','err');
