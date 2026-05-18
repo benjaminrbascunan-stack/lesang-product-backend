@@ -474,23 +474,42 @@ from fastapi import UploadFile, File, Form as FastForm
 import base64, io
 
 def compress_image(image_bytes: bytes, max_size: int = 1200, quality: int = 75) -> bytes:
-    """Comprime imagen a max_size px y calidad especificada."""
+    """Comprime imagen, corrige orientación EXIF y redimensiona."""
     try:
-        from PIL import Image as PILImage
+        from PIL import Image as PILImage, ExifTags
         img = PILImage.open(io.BytesIO(image_bytes))
-        # Convertir a RGB si es necesario
+
+        # Corregir orientación EXIF (fotos de celular)
+        try:
+            exif = img._getexif()
+            if exif:
+                orientation_key = next(
+                    k for k, v in ExifTags.TAGS.items() if v == 'Orientation'
+                )
+                orientation = exif.get(orientation_key)
+                rotations = {3: 180, 6: 270, 8: 90}
+                if orientation in rotations:
+                    img = img.rotate(rotations[orientation], expand=True)
+        except Exception:
+            pass
+
+        # Convertir a RGB
         if img.mode in ('RGBA', 'P', 'LA'):
             img = img.convert('RGB')
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
         # Redimensionar si es muy grande
         w, h = img.size
         if max(w, h) > max_size:
             ratio = max_size / max(w, h)
             img = img.resize((int(w*ratio), int(h*ratio)), PILImage.LANCZOS)
-        # Comprimir
+
+        # Comprimir sin metadatos EXIF
         out = io.BytesIO()
         img.save(out, format='JPEG', quality=quality, optimize=True)
         compressed = out.getvalue()
-        print(f"[Foto] Comprimida: {len(image_bytes)//1024}KB → {len(compressed)//1024}KB")
+        print(f"[Foto] Comprimida y orientada: {len(image_bytes)//1024}KB → {len(compressed)//1024}KB")
         return compressed
     except Exception as e:
         print(f"[Foto] Compresión falló: {e}, usando original")
