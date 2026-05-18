@@ -691,6 +691,101 @@ async def linkear_consignacion(row_index: int, shopify_gid: str):
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+# ── Stock Marcas ──────────────────────────────────────────────────────────────
+@app.get("/pos/stock-marcas")
+def get_stock_marcas():
+    try:
+        from pos_sheets import get_stock_marcas
+        items = get_stock_marcas()
+        return {"items": items, "total": len(items)}
+    except Exception as e:
+        return {"items": [], "total": 0, "error": str(e)}
+
+
+@app.post("/pos/stock-marcas")
+async def crear_stock_marca(
+    nombre_prenda: str = FastForm(...),
+    marca:         str = FastForm(...),
+    precio_venta:  str = FastForm(...),
+    notas:         str = FastForm(""),
+    tallas_json:   str = FastForm("{}"),
+    foto: UploadFile = File(None),
+):
+    from datetime import datetime
+    import json as _json
+    item = {
+        "nombre_prenda": nombre_prenda,
+        "marca": marca,
+        "precio_venta": float(precio_venta),
+        "notas": notas,
+        "tallas": _json.loads(tallas_json),
+        "foto_link": "",
+    }
+
+    # Subir foto a Drive
+    if foto:
+        try:
+            from pos_sheets import get_creds
+            from googleapiclient.discovery import build as gbuild
+            from googleapiclient.http import MediaIoBaseUpload
+            import io as _io
+            creds = get_creds()
+            drive = gbuild("drive","v3",credentials=creds)
+            q = "name='Stock Marcas — Lé Sang' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+            res = drive.files().list(q=q, fields="files(id)").execute()
+            folders = res.get("files",[])
+            folder_id = folders[0]["id"] if folders else drive.files().create(
+                body={"name":"Stock Marcas — Lé Sang","mimeType":"application/vnd.google-apps.folder"},
+                fields="id"
+            ).execute()["id"]
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fname = f"STOCK_{ts}_{nombre_prenda.replace(' ','_')[:25]}.jpg"
+            content_bytes = await foto.read()
+            uploaded = drive.files().create(
+                body={"name":fname,"parents":[folder_id]},
+                media_body=MediaIoBaseUpload(_io.BytesIO(content_bytes),
+                    mimetype=foto.content_type or "image/jpeg", resumable=False),
+                fields="id,webViewLink"
+            ).execute()
+            drive.permissions().create(
+                fileId=uploaded["id"], body={"type":"anyone","role":"reader"}
+            ).execute()
+            item["foto_link"] = uploaded.get("webViewLink","")
+        except Exception as e:
+            print(f"[Stock] foto error: {e}")
+
+    try:
+        from pos_sheets import append_stock_marca
+        result = append_stock_marca(item)
+        return {"success": True, "row": result.get("row"), "foto_link": item["foto_link"]}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.post("/pos/stock-marcas/{row_index}/vender")
+async def vender_stock_marca(row_index: int, venta: VentaIn):
+    """Vende un item del stock interno: descuenta talla y registra venta."""
+    from datetime import datetime
+    try:
+        from pos_sheets import descontar_talla
+        talla = venta.talla or ""
+        descontar_talla(row_index, talla)
+    except Exception as e:
+        print(f"[Stock] descontar error: {e}")
+
+    v = venta.dict()
+    if not v.get("timestamp"):
+        v["timestamp"] = datetime.now().isoformat()
+    v["order_name"] = None
+    result = sheets_append(v)
+    return {
+        "success": True,
+        "sheet_url": result["sheet_url"] if result else None,
+        "mes": result["mes"] if result else "",
+        "neto_tienda": v["neto_tienda"],
+    }
+
 # ── Servir el POS frontend ────────────────────────────────────────────────────
 app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")
 

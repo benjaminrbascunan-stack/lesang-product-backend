@@ -325,7 +325,11 @@ def get_or_create_sheet() -> str:
         "properties": {"title": "Lé Sang — Ventas POS"},
         "sheets": [
             {"properties": {"title": "📊 Resumen", "tabColor": {"red":1.0,"green":0.357,"blue":0.0},
-                             "gridProperties": {"rowCount": 50, "columnCount": 10}}}
+                             "gridProperties": {"rowCount": 50, "columnCount": 10}}},
+            {"properties": {"title": "📦 Consignaciones", "tabColor": {"red":0.2,"green":0.6,"blue":0.9},
+                             "gridProperties": {"rowCount": 500, "columnCount": 15}}},
+            {"properties": {"title": "📦 Stock Marcas", "tabColor": {"red":0.2,"green":0.8,"blue":0.4},
+                             "gridProperties": {"rowCount": 500, "columnCount": 20}}}
         ] + [
             {"properties": {"title": m, "gridProperties": {"rowCount": 1000, "columnCount": N_COLS + 2}}}
             for m in MESES
@@ -580,5 +584,354 @@ def delete_venta(mes: str, row_index: int) -> bool:
             "range": {"sheetId": gid, "dimension": "ROWS",
                       "startIndex": row_index - 1, "endIndex": row_index}
         }}]}
+    ).execute()
+    return True
+
+
+# ── CONSIGNACIONES ────────────────────────────────────────────────────────────
+
+CONSIG_HEADERS = [
+    "Estado",           # A: Activa / Vendida
+    "Nombre prenda",    # B
+    "Talla",            # C
+    "Dueño",            # D
+    "Instagram",        # E
+    "Email",            # F
+    "Teléfono",         # G
+    "Precio venta",     # H
+    "Valor acordado",   # I (lo que se le paga al dueño)
+    "Foto (link)",      # J
+    "Shopify GID",      # K
+    "Fecha ingreso",    # L
+    "Fecha venta",      # M
+    "Orden Shopify",    # N
+    "Notas",            # O
+]
+
+def _format_consig_sheet(sheets_svc, sid, sheet_map):
+    gid = sheet_map.get("📦 Consignaciones")
+    if gid is None:
+        return
+    C_BLUE = {"red":0.2,"green":0.6,"blue":0.9}
+    reqs = [
+        {"updateCells": {
+            "rows": [{"values": [
+                {"userEnteredValue":{"stringValue": h},
+                 "userEnteredFormat":{
+                     "backgroundColor": C_BLACK,
+                     "textFormat":{"bold":True,"foregroundColor":C_WHITE,"fontSize":9},
+                     "horizontalAlignment":"CENTER","verticalAlignment":"MIDDLE"
+                 }} for h in CONSIG_HEADERS
+            ]}],
+            "fields": "userEnteredValue,userEnteredFormat",
+            "start": {"sheetId":gid,"rowIndex":0,"columnIndex":0}
+        }},
+        {"updateBorders":{
+            "range":{"sheetId":gid,"startRowIndex":0,"endRowIndex":1,
+                     "startColumnIndex":0,"endColumnIndex":len(CONSIG_HEADERS)},
+            "bottom":{"style":"SOLID_MEDIUM","color":C_BLUE}
+        }},
+        {"updateDimensionProperties":{
+            "range":{"sheetId":gid,"dimension":"ROWS","startIndex":0,"endIndex":1},
+            "properties":{"pixelSize":32},"fields":"pixelSize"
+        }},
+        {"updateSheetProperties":{
+            "properties":{"sheetId":gid,"gridProperties":{"frozenRowCount":1}},
+            "fields":"gridProperties.frozenRowCount"
+        }},
+    ]
+    # Anchos de columna
+    widths = [80,160,60,120,110,150,110,110,110,120,120,100,100,100,180]
+    for ci,w in enumerate(widths):
+        reqs.append({"updateDimensionProperties":{
+            "range":{"sheetId":gid,"dimension":"COLUMNS","startIndex":ci,"endIndex":ci+1},
+            "properties":{"pixelSize":w},"fields":"pixelSize"
+        }})
+    sheets_svc.spreadsheets().batchUpdate(
+        spreadsheetId=sid, body={"requests":reqs}
+    ).execute()
+
+
+def append_consignacion(consig: dict) -> dict:
+    """Registra una consignación nueva en la hoja Consignaciones."""
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+
+    from datetime import datetime
+    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    row = [
+        "Activa",
+        consig.get("nombre_prenda",""),
+        consig.get("talla",""),
+        consig.get("dueno",""),
+        consig.get("instagram",""),
+        consig.get("email",""),
+        consig.get("telefono",""),
+        float(consig.get("precio_venta",0)),
+        float(consig.get("valor_acordado",0)),
+        consig.get("foto_link",""),
+        consig.get("shopify_gid",""),
+        fecha,
+        "",  # fecha venta vacía
+        "",  # orden shopify vacía
+        consig.get("notas",""),
+    ]
+
+    # Obtener próxima fila
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid,
+        range="📦 Consignaciones!A2:A",
+        majorDimension="COLUMNS",
+    ).execute()
+    existing = result.get("values",[[]])[0] if result.get("values") else []
+    next_row = len(existing) + 2
+
+    sheets.spreadsheets().values().update(
+        spreadsheetId=sid,
+        range=f"📦 Consignaciones!A{next_row}:O{next_row}",
+        valueInputOption="RAW",
+        body={"values":[row]},
+    ).execute()
+
+    print(f"[Consig] Registrada: {consig.get('nombre_prenda')} fila {next_row}")
+    return {"sheet_url": f"https://docs.google.com/spreadsheets/d/{sid}", "row": next_row}
+
+
+def get_consignaciones() -> list:
+    """Lee todas las consignaciones."""
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid,
+        range="📦 Consignaciones!A2:O",
+        valueRenderOption="UNFORMATTED_VALUE",
+    ).execute()
+
+    rows = result.get("values",[])
+    consigs = []
+    for i, row in enumerate(rows):
+        if not row or not any(row): continue
+        while len(row) < len(CONSIG_HEADERS): row.append("")
+        consigs.append({
+            "row_index": i+2,
+            "estado":         str(row[0]),
+            "nombre_prenda":  str(row[1]),
+            "talla":          str(row[2]),
+            "dueno":          str(row[3]),
+            "instagram":      str(row[4]),
+            "email":          str(row[5]),
+            "telefono":       str(row[6]),
+            "precio_venta":   float(row[7]) if row[7] else 0,
+            "valor_acordado": float(row[8]) if row[8] else 0,
+            "foto_link":      str(row[9]),
+            "shopify_gid":    str(row[10]),
+            "fecha_ingreso":  str(row[11]),
+            "fecha_venta":    str(row[12]),
+            "order_name":     str(row[13]),
+            "notas":          str(row[14]),
+        })
+    return consigs
+
+
+def marcar_consignacion_vendida(row_index: int, order_name: str) -> bool:
+    """Actualiza estado a Vendida cuando se procesa la venta."""
+    from datetime import datetime
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+
+    fecha_venta = datetime.now().strftime("%d/%m/%Y %H:%M")
+    sheets.spreadsheets().values().batchUpdate(
+        spreadsheetId=sid,
+        body={"valueInputOption":"RAW","data":[
+            {"range": f"📦 Consignaciones!A{row_index}", "values":[["Vendida"]]},
+            {"range": f"📦 Consignaciones!M{row_index}", "values":[[fecha_venta]]},
+            {"range": f"📦 Consignaciones!N{row_index}", "values":[[order_name or ""]]},
+        ]}
+    ).execute()
+    return True
+
+
+# ── STOCK MARCAS ──────────────────────────────────────────────────────────────
+
+STOCK_HEADERS = [
+    "Nombre prenda",   # A
+    "Marca",           # B
+    "Precio venta",    # C
+    "Foto (link)",     # D
+    "XXS",             # E
+    "XS",              # F
+    "S",               # G
+    "M",               # H
+    "L",               # I
+    "XL",              # J
+    "XXL",             # K
+    "Total",           # L
+    "Fecha ingreso",   # M
+    "Notas",           # N
+]
+
+TALLAS = ["XXS","XS","S","M","L","XL","XXL"]
+
+
+def _format_stock_sheet(sheets_svc, sid, sheet_map):
+    gid = sheet_map.get("📦 Stock Marcas")
+    if gid is None:
+        return
+    C_GREEN = {"red":0.2,"green":0.8,"blue":0.4}
+    reqs = [
+        {"updateCells": {
+            "rows": [{"values": [
+                {"userEnteredValue":{"stringValue": h},
+                 "userEnteredFormat":{
+                     "backgroundColor": C_BLACK,
+                     "textFormat":{"bold":True,"foregroundColor":C_WHITE,"fontSize":9},
+                     "horizontalAlignment":"CENTER","verticalAlignment":"MIDDLE"
+                 }} for h in STOCK_HEADERS
+            ]}],
+            "fields": "userEnteredValue,userEnteredFormat",
+            "start": {"sheetId":gid,"rowIndex":0,"columnIndex":0}
+        }},
+        {"updateBorders":{
+            "range":{"sheetId":gid,"startRowIndex":0,"endRowIndex":1,
+                     "startColumnIndex":0,"endColumnIndex":len(STOCK_HEADERS)},
+            "bottom":{"style":"SOLID_MEDIUM","color":C_GREEN}
+        }},
+        {"updateDimensionProperties":{
+            "range":{"sheetId":gid,"dimension":"ROWS","startIndex":0,"endIndex":1},
+            "properties":{"pixelSize":32},"fields":"pixelSize"
+        }},
+        {"updateSheetProperties":{
+            "properties":{"sheetId":gid,"gridProperties":{"frozenRowCount":1}},
+            "fields":"gridProperties.frozenRowCount"
+        }},
+    ]
+    widths = [180,120,110,130,55,55,55,55,55,55,55,60,110,180]
+    for ci,w in enumerate(widths):
+        reqs.append({"updateDimensionProperties":{
+            "range":{"sheetId":gid,"dimension":"COLUMNS","startIndex":ci,"endIndex":ci+1},
+            "properties":{"pixelSize":w},"fields":"pixelSize"
+        }})
+    sheets_svc.spreadsheets().batchUpdate(
+        spreadsheetId=sid, body={"requests":reqs}
+    ).execute()
+
+
+def append_stock_marca(item: dict) -> dict:
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    from datetime import datetime
+    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+    tallas = item.get("tallas", {})
+    total = sum(int(tallas.get(t, 0) or 0) for t in TALLAS)
+    row = [
+        item.get("nombre_prenda",""),
+        item.get("marca",""),
+        float(item.get("precio_venta", 0)),
+        item.get("foto_link",""),
+        int(tallas.get("XXS",0) or 0),
+        int(tallas.get("XS",0) or 0),
+        int(tallas.get("S",0) or 0),
+        int(tallas.get("M",0) or 0),
+        int(tallas.get("L",0) or 0),
+        int(tallas.get("XL",0) or 0),
+        int(tallas.get("XXL",0) or 0),
+        total,
+        fecha,
+        item.get("notas",""),
+    ]
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid,
+        range="📦 Stock Marcas!A2:A",
+        majorDimension="COLUMNS",
+    ).execute()
+    existing = result.get("values",[[]])[0] if result.get("values") else []
+    next_row = len(existing) + 2
+    sheets.spreadsheets().values().update(
+        spreadsheetId=sid,
+        range=f"📦 Stock Marcas!A{next_row}:N{next_row}",
+        valueInputOption="RAW",
+        body={"values":[row]},
+    ).execute()
+    print(f"[Stock] Registrado: {item.get('nombre_prenda')} fila {next_row}")
+    return {"row": next_row}
+
+
+def get_stock_marcas() -> list:
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid,
+        range="📦 Stock Marcas!A2:N",
+        valueRenderOption="UNFORMATTED_VALUE",
+    ).execute()
+    rows = result.get("values",[])
+    items = []
+    for i, row in enumerate(rows):
+        if not row or not any(row): continue
+        while len(row) < len(STOCK_HEADERS): row.append("")
+        def n(v):
+            try: return int(float(v or 0))
+            except: return 0
+        tallas = {t: n(row[4+j]) for j,t in enumerate(TALLAS)}
+        total = sum(tallas.values())
+        if total <= 0: continue  # skip agotados
+        items.append({
+            "row_index":      i+2,
+            "nombre_prenda":  str(row[0]),
+            "marca":          str(row[1]),
+            "precio_venta":   float(row[2]) if row[2] else 0,
+            "foto_link":      str(row[3]),
+            "tallas":         tallas,
+            "total":          total,
+            "fecha_ingreso":  str(row[12]),
+            "notas":          str(row[13]),
+        })
+    return items
+
+
+def descontar_talla(row_index: int, talla: str) -> bool:
+    """Descuenta 1 unidad de la talla especificada."""
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    col_map = {"XXS":"E","XS":"F","S":"G","M":"H","L":"I","XL":"J","XXL":"K"}
+    col = col_map.get(talla)
+    if not col:
+        return False
+    # Leer valor actual
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid,
+        range=f"📦 Stock Marcas!{col}{row_index}",
+        valueRenderOption="UNFORMATTED_VALUE",
+    ).execute()
+    vals = result.get("values",[])
+    current = int(float(vals[0][0])) if vals and vals[0] else 0
+    new_val = max(0, current - 1)
+    sheets.spreadsheets().values().update(
+        spreadsheetId=sid,
+        range=f"📦 Stock Marcas!{col}{row_index}",
+        valueInputOption="RAW",
+        body={"values":[[new_val]]},
+    ).execute()
+    # Update total
+    result2 = sheets.spreadsheets().values().get(
+        spreadsheetId=sid,
+        range=f"📦 Stock Marcas!E{row_index}:K{row_index}",
+        valueRenderOption="UNFORMATTED_VALUE",
+    ).execute()
+    vals2 = result2.get("values",[[]])[0] if result2.get("values") else []
+    new_total = sum(int(float(v or 0)) for v in vals2)
+    sheets.spreadsheets().values().update(
+        spreadsheetId=sid,
+        range=f"📦 Stock Marcas!L{row_index}",
+        valueInputOption="RAW",
+        body={"values":[[new_total]]},
     ).execute()
     return True
