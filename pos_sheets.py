@@ -653,6 +653,15 @@ def append_consignacion(consig: dict) -> dict:
     creds  = get_creds()
     sheets = build("sheets","v4",credentials=creds)
     sid    = get_or_create_sheet()
+    # Asegurar que la hoja existe
+    gid = _ensure_sheet_exists(sheets, sid, "📦 Consignaciones", 15)
+    result_check = sheets.spreadsheets().values().get(
+        spreadsheetId=sid, range="📦 Consignaciones!A1:A1"
+    ).execute()
+    if not result_check.get("values"):
+        sheet_map = {"📦 Consignaciones": gid}
+        try: _format_consig_sheet(sheets, sid, sheet_map)
+        except: pass
 
     from datetime import datetime
     fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -817,10 +826,39 @@ def _format_stock_sheet(sheets_svc, sid, sheet_map):
     ).execute()
 
 
+def _ensure_sheet_exists(sheets_svc, sid: str, title: str, cols: int = 20) -> int:
+    """Crea la hoja si no existe, retorna su sheetId."""
+    meta = sheets_svc.spreadsheets().get(spreadsheetId=sid).execute()
+    for s in meta["sheets"]:
+        if s["properties"]["title"] == title:
+            return s["properties"]["sheetId"]
+    # Crear hoja
+    resp = sheets_svc.spreadsheets().batchUpdate(
+        spreadsheetId=sid,
+        body={"requests":[{"addSheet":{"properties":{
+            "title": title,
+            "gridProperties":{"rowCount":500,"columnCount":cols}
+        }}}]}
+    ).execute()
+    new_gid = resp["replies"][0]["addSheet"]["properties"]["sheetId"]
+    print(f"[Sheets] Hoja creada: {title}")
+    return new_gid
+
+
 def append_stock_marca(item: dict) -> dict:
     creds  = get_creds()
     sheets = build("sheets","v4",credentials=creds)
     sid    = get_or_create_sheet()
+    # Asegurar que la hoja existe
+    gid = _ensure_sheet_exists(sheets, sid, "📦 Stock Marcas", 20)
+    # Aplicar formato si es nueva (sin cabeceras)
+    result_check = sheets.spreadsheets().values().get(
+        spreadsheetId=sid, range="📦 Stock Marcas!A1:A1"
+    ).execute()
+    if not result_check.get("values"):
+        sheet_map = {"📦 Stock Marcas": gid}
+        try: _format_stock_sheet(sheets, sid, sheet_map)
+        except: pass
     from datetime import datetime
     fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
     tallas = item.get("tallas", {})
