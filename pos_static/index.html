@@ -2824,8 +2824,11 @@ function cerrarStockVenta(){
   stockSelectedItem=null; stockSelectedTalla=null;
 }
 
+var _stockVentaProcessing = false;
 async function confirmarStockVenta(){
+  if(_stockVentaProcessing) return;
   if(!stockSelectedItem||!stockSelectedTalla){toast('Selecciona una talla','err');return;}
+  _stockVentaProcessing = true;
   var btn=document.getElementById('sv-submit');
   btn.textContent='Procesando...'; btn.disabled=true;
   var precio=stockSelectedItem.precio_venta;
@@ -2853,18 +2856,23 @@ async function confirmarStockVenta(){
     });
     var d=await r.json();
     if(!r.ok) throw new Error(d.detail||'Error');
+    // Guardar referencia antes de cerrar
+    var soldItem = stockSelectedItem;
+    var soldTalla = stockSelectedTalla;
     toast('Venta registrada ✓','ok');
     cerrarStockVenta();
+    _stockVentaProcessing = false;
     // Actualizar stock local
-    if(stockSelectedItem.tallas[stockSelectedTalla]>0){
-      stockSelectedItem.tallas[stockSelectedTalla]--;
-      stockSelectedItem.total--;
+    if(soldItem && soldItem.tallas && soldItem.tallas[soldTalla]>0){
+      soldItem.tallas[soldTalla]--;
+      soldItem.total--;
     }
     loadHistorial(MES);
     await loadStockMarcas();
   }catch(e){
     toast(e.message||'Error','err');
     btn.textContent='Confirmar venta →'; btn.disabled=false;
+    _stockVentaProcessing = false;
   }
 }
 

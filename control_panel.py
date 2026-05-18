@@ -473,6 +473,29 @@ def pos_sheet_url():
 from fastapi import UploadFile, File, Form as FastForm
 import base64, io
 
+def compress_image(image_bytes: bytes, max_size: int = 1200, quality: int = 75) -> bytes:
+    """Comprime imagen a max_size px y calidad especificada."""
+    try:
+        from PIL import Image as PILImage
+        img = PILImage.open(io.BytesIO(image_bytes))
+        # Convertir a RGB si es necesario
+        if img.mode in ('RGBA', 'P', 'LA'):
+            img = img.convert('RGB')
+        # Redimensionar si es muy grande
+        w, h = img.size
+        if max(w, h) > max_size:
+            ratio = max_size / max(w, h)
+            img = img.resize((int(w*ratio), int(h*ratio)), PILImage.LANCZOS)
+        # Comprimir
+        out = io.BytesIO()
+        img.save(out, format='JPEG', quality=quality, optimize=True)
+        compressed = out.getvalue()
+        print(f"[Foto] Comprimida: {len(image_bytes)//1024}KB → {len(compressed)//1024}KB")
+        return compressed
+    except Exception as e:
+        print(f"[Foto] Compresión falló: {e}, usando original")
+        return image_bytes
+
 @app.post("/pos/foto")
 async def subir_foto(
     foto: UploadFile = File(...),
@@ -507,11 +530,12 @@ async def subir_foto(
         prenda_safe = nombre_prenda.replace(" ", "_")[:30] if nombre_prenda else "sin_nombre"
         filename = f"{ts}_{prenda_safe}_{precio}CLP.jpg"
 
-        # Subir foto a Drive
+        # Subir foto a Drive (comprimida)
         content_bytes = await foto.read()
+        content_bytes = compress_image(content_bytes)
         media = MediaIoBaseUpload(
             io.BytesIO(content_bytes),
-            mimetype=foto.content_type or "image/jpeg",
+            mimetype="image/jpeg",
             resumable=False
         )
         file_meta = {"name": filename, "parents": [folder_id]}
@@ -584,8 +608,9 @@ async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None)
             filename=f"CONSIG_{ts}_{nombre_safe}.jpg"
 
             content_bytes=await foto.read()
+            content_bytes=compress_image(content_bytes)
             media=MediaIoBaseUpload(io.BytesIO(content_bytes),
-                                    mimetype=foto.content_type or "image/jpeg",
+                                    mimetype="image/jpeg",
                                     resumable=False)
             uploaded=drive.files().create(
                 body={"name":filename,"parents":[folder_id]},
@@ -742,6 +767,7 @@ async def crear_stock_marca(
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             fname = f"STOCK_{ts}_{nombre_prenda.replace(' ','_')[:25]}.jpg"
             content_bytes = await foto.read()
+            content_bytes = compress_image(content_bytes)
             uploaded = drive.files().create(
                 body={"name":fname,"parents":[folder_id]},
                 media_body=MediaIoBaseUpload(_io.BytesIO(content_bytes),
