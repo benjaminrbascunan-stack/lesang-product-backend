@@ -539,7 +539,7 @@ async def subir_foto(
 
         # Subir foto a Drive (comprimida)
         content_bytes = await foto.read()
-        content_bytes = compress_image(content_bytes, quality=int(quality))
+        content_bytes = compress_image(content_bytes)
         media = MediaIoBaseUpload(
             io.BytesIO(content_bytes),
             mimetype="image/jpeg",
@@ -580,11 +580,36 @@ class ConsignacionIn(BaseModel):
     foto_link:      Optional[str] = ""
 
 @app.post("/pos/consignacion")
-async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None), quality: str = FastForm("75")):
+async def crear_consignacion(
+    nombre_prenda:  str   = FastForm(...),
+    dueno:          str   = FastForm(...),
+    precio_venta:   str   = FastForm(...),
+    valor_acordado: str   = FastForm(...),
+    talla:          str   = FastForm(""),
+    instagram:      str   = FastForm(""),
+    email:          str   = FastForm(""),
+    telefono:       str   = FastForm(""),
+    marca:          str   = FastForm("Consignacion"),
+    notas:          str   = FastForm(""),
+    foto: UploadFile = File(None),
+):
     from datetime import datetime
     import io
 
-    consig = body.dict()
+    consig = {
+        "nombre_prenda": nombre_prenda,
+        "dueno": dueno,
+        "precio_venta": float(precio_venta),
+        "valor_acordado": float(valor_acordado),
+        "talla": talla,
+        "instagram": instagram,
+        "email": email,
+        "telefono": telefono,
+        "marca": marca,
+        "notas": notas,
+        "foto_link": "",
+    }
+
     foto_link = ""
 
     # 1. Subir foto a Drive (obligatoria)
@@ -615,7 +640,7 @@ async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None)
             filename=f"CONSIG_{ts}_{nombre_safe}.jpg"
 
             content_bytes=await foto.read()
-            content_bytes=compress_image(content_bytes, quality=int(quality))
+            content_bytes=compress_image(content_bytes)
             media=MediaIoBaseUpload(io.BytesIO(content_bytes),
                                     mimetype="image/jpeg",
                                     resumable=False)
@@ -775,7 +800,7 @@ async def crear_stock_marca(
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             fname = f"STOCK_{ts}_{nombre_prenda.replace(' ','_')[:25]}.jpg"
             content_bytes = await foto.read()
-            content_bytes = compress_image(content_bytes, quality=int(quality))
+            content_bytes = compress_image(content_bytes)
             uploaded = drive.files().create(
                 body={"name":fname,"parents":[folder_id]},
                 media_body=MediaIoBaseUpload(_io.BytesIO(content_bytes),
