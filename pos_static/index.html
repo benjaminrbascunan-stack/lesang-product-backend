@@ -2707,13 +2707,117 @@ async function buscarMatchConsignacion(rowIndex, nombre){
 }
 
 
+function editarConsig(rowIndex){
+  var all = (consigData.activas||[]).concat(consigData.vendidas||[]).concat(consigData.pagadas||[]);
+  var c = all.find(function(x){ return x.row_index===rowIndex; });
+  if(!c) return;
+  abrirFormConsig();
+  setTimeout(function(){
+    document.getElementById('cf-nombre').value = c.nombre_prenda||'';
+    document.getElementById('cf-talla').value  = c.talla||'';
+    document.getElementById('cf-precio').value = c.precio_venta||'';
+    document.getElementById('cf-acordado').value = c.valor_acordado||'';
+    document.getElementById('cf-dueno').value  = c.dueno||'';
+    document.getElementById('cf-ig').value     = c.instagram||'';
+    document.getElementById('cf-tel').value    = c.telefono||'';
+    document.getElementById('cf-email').value  = c.email||'';
+    document.getElementById('cf-notas').value  = c.notas||'';
+    var btn = document.getElementById('consig-submit-btn');
+    btn.textContent = 'Guardar cambios';
+    btn.onclick = function(){ actualizarConsig(rowIndex); };
+  }, 100);
+}
+
+async function actualizarConsig(rowIndex){
+  var nombre = document.getElementById('cf-nombre').value.trim();
+  var dueno  = document.getElementById('cf-dueno').value.trim();
+  var precio = document.getElementById('cf-precio').value;
+  var acordado = document.getElementById('cf-acordado').value;
+  if(!nombre||!dueno||!precio||!acordado){toast('Completa los campos obligatorios','err');return;}
+  var btn = document.getElementById('consig-submit-btn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  try{
+    var fd = new FormData();
+    fd.append('nombre_prenda', nombre);
+    fd.append('talla', document.getElementById('cf-talla').value);
+    fd.append('precio_venta', precio);
+    fd.append('valor_acordado', acordado);
+    fd.append('dueno', dueno);
+    fd.append('instagram', document.getElementById('cf-ig').value);
+    fd.append('telefono', document.getElementById('cf-tel').value);
+    fd.append('email', document.getElementById('cf-email').value);
+    fd.append('notas', document.getElementById('cf-notas').value);
+    var r = await fetch(API+'/pos/consignacion/'+rowIndex, {method:'PATCH', body:fd});
+    if(!r.ok) throw new Error('Error al actualizar');
+    toast('Consignacion actualizada','ok');
+    cerrarFormConsig();
+    await loadConsignaciones();
+  }catch(e){
+    toast(e.message,'err');
+  }
+  btn.textContent='Registrar consignacion'; btn.disabled=false;
+  btn.onclick = registrarConsignacion;
+}
+
 function handlePagarConsig(btn){
   var row = parseInt(btn.getAttribute('data-row'));
   var dueno = btn.getAttribute('data-dueno');
   marcarPagadaConsig(row, dueno);
 }
 
-function handleConsigDelete(btn){
+function editarConsig(rowIndex){
+  var all = (consigData.activas||[]).concat(consigData.vendidas||[]).concat(consigData.pagadas||[]);
+  var c = all.find(function(x){ return x.row_index===rowIndex; });
+  if(!c) return;
+  abrirFormConsig();
+  setTimeout(function(){
+    document.getElementById('cf-nombre').value = c.nombre_prenda||'';
+    document.getElementById('cf-talla').value  = c.talla||'';
+    document.getElementById('cf-precio').value = c.precio_venta||'';
+    document.getElementById('cf-acordado').value = c.valor_acordado||'';
+    document.getElementById('cf-dueno').value  = c.dueno||'';
+    document.getElementById('cf-ig').value     = c.instagram||'';
+    document.getElementById('cf-tel').value    = c.telefono||'';
+    document.getElementById('cf-email').value  = c.email||'';
+    document.getElementById('cf-notas').value  = c.notas||'';
+    var btn = document.getElementById('consig-submit-btn');
+    btn.textContent = 'Guardar cambios';
+    btn.onclick = function(){ actualizarConsig(rowIndex); };
+  }, 100);
+}
+
+async function actualizarConsig(rowIndex){
+  var nombre = document.getElementById('cf-nombre').value.trim();
+  var dueno  = document.getElementById('cf-dueno').value.trim();
+  var precio = document.getElementById('cf-precio').value;
+  var acordado = document.getElementById('cf-acordado').value;
+  if(!nombre||!dueno||!precio||!acordado){toast('Completa los campos obligatorios','err');return;}
+  var btn = document.getElementById('consig-submit-btn');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  try{
+    var fd = new FormData();
+    fd.append('nombre_prenda', nombre);
+    fd.append('talla', document.getElementById('cf-talla').value);
+    fd.append('precio_venta', precio);
+    fd.append('valor_acordado', acordado);
+    fd.append('dueno', dueno);
+    fd.append('instagram', document.getElementById('cf-ig').value);
+    fd.append('telefono', document.getElementById('cf-tel').value);
+    fd.append('email', document.getElementById('cf-email').value);
+    fd.append('notas', document.getElementById('cf-notas').value);
+    var r = await fetch(API+'/pos/consignacion/'+rowIndex, {method:'PATCH', body:fd});
+    if(!r.ok) throw new Error('Error al actualizar');
+    toast('Consignacion actualizada','ok');
+    cerrarFormConsig();
+    await loadConsignaciones();
+  }catch(e){
+    toast(e.message,'err');
+  }
+  btn.textContent='Registrar consignacion'; btn.disabled=false;
+  btn.onclick = registrarConsignacion;
+}
+
+function handlePagarConsig(btn){
   var row = parseInt(btn.getAttribute('data-row'));
   var nombre = btn.getAttribute('data-nombre');
   showConfirm(
@@ -2885,7 +2989,10 @@ function renderInventario(){
         +'<div class="consig-body">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
         +'<span class="consig-badge-estado '+estadoCls+'">'+c.estado+'</span>'
-        +'<button class="stock-del-btn" style="font-size:9px;padding:3px 8px" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleConsigDelete(this)">✕ Eliminar</button>'
+        +'<div style="display:flex;gap:4px">'
+        +'<button class="stock-edit-btn" style="font-size:9px;padding:3px 8px" data-row="'+c.row_index+'" onclick="editarConsig('+c.row_index+')">Editar</button>'
+        +'<button class="stock-del-btn" style="font-size:9px;padding:3px 8px" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleConsigDelete(this)">✕</button>'
+        +'</div>'
         +'</div>'
         +'<div class="consig-nombre">'+esc(c.nombre_prenda)+(c.talla?' <span style="color:var(--gray4);font-weight:400;font-size:10px">'+c.talla+'</span>':'')+'</div>'
         +'<div class="consig-dueno">'+esc(c.dueno)+(c.instagram?' · '+esc(c.instagram):'')+'</div>'

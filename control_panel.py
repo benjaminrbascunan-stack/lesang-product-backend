@@ -755,6 +755,68 @@ async def linkear_consignacion(row_index: int, shopify_gid: str):
 
 # ── Stock Marcas ──────────────────────────────────────────────────────────────
 
+
+@app.patch("/pos/consignacion/{row_index}")
+async def actualizar_consignacion(
+    row_index: int,
+    nombre_prenda:  str = FastForm(...),
+    dueno:          str = FastForm(...),
+    precio_venta:   str = FastForm(...),
+    valor_acordado: str = FastForm(...),
+    talla:          str = FastForm(""),
+    instagram:      str = FastForm(""),
+    email:          str = FastForm(""),
+    telefono:       str = FastForm(""),
+    notas:          str = FastForm(""),
+):
+    try:
+        from pos_sheets import get_creds, get_or_create_sheet
+        from googleapiclient.discovery import build as sbuild
+        creds  = get_creds()
+        sheets = sbuild("sheets","v4",credentials=creds)
+        sid    = get_or_create_sheet()
+        # Read existing foto and shopify_gid to preserve them
+        existing = sheets.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range=f"📦 Consignaciones!A{row_index}:N{row_index}",
+            valueRenderOption="UNFORMATTED_VALUE",
+        ).execute()
+        row_data = existing.get("values",[[]])[0] if existing.get("values") else []
+        while len(row_data) < 15: row_data.append("")
+        estado      = row_data[0]  # preserve
+        foto_link   = row_data[9]  # preserve
+        shopify_gid = row_data[10] # preserve
+        fecha_ing   = row_data[11] # preserve
+        fecha_venta = row_data[12] # preserve
+        order_name  = row_data[13] # preserve
+
+        new_row = [
+            estado,
+            nombre_prenda,
+            talla,
+            dueno,
+            instagram,
+            email,
+            telefono,
+            float(precio_venta),
+            float(valor_acordado),
+            foto_link,
+            shopify_gid,
+            fecha_ing,
+            fecha_venta,
+            order_name,
+            notas,
+        ]
+        sheets.spreadsheets().values().update(
+            spreadsheetId=sid,
+            range=f"📦 Consignaciones!A{row_index}:O{row_index}",
+            valueInputOption="RAW",
+            body={"values":[new_row]},
+        ).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.patch("/pos/consignacion/{row_index}/pagada")
 async def marcar_consig_pagada(row_index: int):
     try:
