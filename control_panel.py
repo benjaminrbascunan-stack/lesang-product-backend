@@ -476,27 +476,14 @@ import base64, io
 def compress_image(image_bytes: bytes, max_size: int = 1200, quality: int = 75) -> bytes:
     """Comprime imagen, corrige orientación EXIF y redimensiona."""
     try:
-        from PIL import Image as PILImage, ExifTags
+        from PIL import Image as PILImage, ImageOps
         img = PILImage.open(io.BytesIO(image_bytes))
 
-        # Corregir orientación EXIF (fotos de celular)
-        try:
-            exif = img._getexif()
-            if exif:
-                orientation_key = next(
-                    k for k, v in ExifTags.TAGS.items() if v == 'Orientation'
-                )
-                orientation = exif.get(orientation_key)
-                rotations = {3: 180, 6: 270, 8: 90}
-                if orientation in rotations:
-                    img = img.rotate(rotations[orientation], expand=True)
-        except Exception:
-            pass
+        # Corregir orientación EXIF — método más confiable
+        img = ImageOps.exif_transpose(img)
 
         # Convertir a RGB
-        if img.mode in ('RGBA', 'P', 'LA'):
-            img = img.convert('RGB')
-        elif img.mode != 'RGB':
+        if img.mode != 'RGB':
             img = img.convert('RGB')
 
         # Redimensionar si es muy grande
@@ -505,14 +492,14 @@ def compress_image(image_bytes: bytes, max_size: int = 1200, quality: int = 75) 
             ratio = max_size / max(w, h)
             img = img.resize((int(w*ratio), int(h*ratio)), PILImage.LANCZOS)
 
-        # Comprimir sin metadatos EXIF
+        # Guardar sin metadatos EXIF
         out = io.BytesIO()
         img.save(out, format='JPEG', quality=quality, optimize=True)
         compressed = out.getvalue()
-        print(f"[Foto] Comprimida y orientada: {len(image_bytes)//1024}KB → {len(compressed)//1024}KB")
+        print(f"[Foto] OK: {len(image_bytes)//1024}KB → {len(compressed)//1024}KB")
         return compressed
     except Exception as e:
-        print(f"[Foto] Compresión falló: {e}, usando original")
+        print(f"[Foto] Error: {e}, usando original")
         return image_bytes
 
 @app.post("/pos/foto")
@@ -521,6 +508,7 @@ async def subir_foto(
     nombre_prenda: str = FastForm(""),
     precio: str = FastForm(""),
     vendedor: str = FastForm(""),
+    quality: str = FastForm("75"),
 ):
     from datetime import datetime as dt
     try:
@@ -551,7 +539,7 @@ async def subir_foto(
 
         # Subir foto a Drive (comprimida)
         content_bytes = await foto.read()
-        content_bytes = compress_image(content_bytes)
+        content_bytes = compress_image(content_bytes, quality=int(quality))
         media = MediaIoBaseUpload(
             io.BytesIO(content_bytes),
             mimetype="image/jpeg",
@@ -592,7 +580,7 @@ class ConsignacionIn(BaseModel):
     foto_link:      Optional[str] = ""
 
 @app.post("/pos/consignacion")
-async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None)):
+async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None), quality: str = FastForm("75")):
     from datetime import datetime
     import io
 
@@ -627,7 +615,7 @@ async def crear_consignacion(body: ConsignacionIn, foto: UploadFile = File(None)
             filename=f"CONSIG_{ts}_{nombre_safe}.jpg"
 
             content_bytes=await foto.read()
-            content_bytes=compress_image(content_bytes)
+            content_bytes=compress_image(content_bytes, quality=int(quality))
             media=MediaIoBaseUpload(io.BytesIO(content_bytes),
                                     mimetype="image/jpeg",
                                     resumable=False)
@@ -755,6 +743,7 @@ async def crear_stock_marca(
     notas:         str = FastForm(""),
     tallas_json:   str = FastForm("{}"),
     foto: UploadFile = File(None),
+    quality: str = FastForm("75"),
 ):
     from datetime import datetime
     import json as _json
@@ -786,7 +775,7 @@ async def crear_stock_marca(
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             fname = f"STOCK_{ts}_{nombre_prenda.replace(' ','_')[:25]}.jpg"
             content_bytes = await foto.read()
-            content_bytes = compress_image(content_bytes)
+            content_bytes = compress_image(content_bytes, quality=int(quality))
             uploaded = drive.files().create(
                 body={"name":fname,"parents":[folder_id]},
                 media_body=MediaIoBaseUpload(_io.BytesIO(content_bytes),

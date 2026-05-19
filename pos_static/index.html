@@ -945,6 +945,32 @@ nav{
   .talla-selector{grid-template-columns:repeat(4,1fr)}
   .stock-form-overlay{top:var(--nav)}
 }
+
+/* ── Confirm modal ── */
+.confirm-modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.6);z-index:2000;
+  align-items:center;justify-content:center;
+}
+.confirm-modal.show{display:flex}
+.confirm-box{
+  background:var(--white);width:min(340px,92vw);
+  padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.2);
+}
+.confirm-title{font-size:12px;font-weight:600;letter-spacing:.1em;margin-bottom:8px}
+.confirm-msg{font-size:11px;color:var(--gray4);line-height:1.6;margin-bottom:20px}
+.confirm-btns{display:flex;gap:8px;justify-content:flex-end}
+.confirm-cancel{
+  padding:8px 16px;background:none;border:1px solid var(--gray2);
+  color:var(--gray4);font-family:var(--font);font-size:10px;
+  letter-spacing:.1em;cursor:pointer;
+}
+.confirm-ok{
+  padding:8px 16px;background:var(--black);color:var(--white);
+  border:none;font-family:var(--font);font-size:10px;
+  letter-spacing:.1em;cursor:pointer;
+}
+.confirm-ok.danger{background:#cc3300}
 </style>
 </head>
 <body>
@@ -1504,6 +1530,25 @@ function closeImgModal() {
 document.addEventListener('keydown', function(e){
   if(e.key==='Escape') closeImgModal();
 });
+
+
+// ── CONFIRM MODAL ─────────────────────────────────────────────────────────────
+var _confirmResolve = null;
+
+function showConfirm(title, msg, okLabel){
+  return new Promise(function(resolve){
+    _confirmResolve = resolve;
+    document.getElementById('confirm-title').textContent = title || 'Confirmar';
+    document.getElementById('confirm-msg').textContent = msg || '';
+    document.getElementById('confirm-ok-btn').textContent = okLabel || 'Aceptar';
+    document.getElementById('confirm-modal').classList.add('show');
+  });
+}
+
+function closeConfirm(result){
+  document.getElementById('confirm-modal').classList.remove('show');
+  if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
+}
 
 // ── BOTTOM SHEET (mobile) ────────────────────────────────────────────────────
 function isMobile() { return window.innerWidth <= 768; }
@@ -2141,7 +2186,23 @@ async function eliminarVenta(mes,rowIdx){
 }
 
 // ── Config
+function savePhotoQuality(){
+  var val = parseInt(document.getElementById('quality-slider').value);
+  localStorage.setItem('photo_quality', val);
+  toast('Calidad guardada: '+val+'%','ok');
+}
+
+function getPhotoQuality(){
+  return parseInt(localStorage.getItem('photo_quality')||'75');
+}
+
 function renderConfigPage(){
+  // Load saved quality
+  var q = getPhotoQuality();
+  var slider = document.getElementById('quality-slider');
+  var label = document.getElementById('quality-val');
+  if(slider) slider.value = q;
+  if(label) label.textContent = q+'%';
   const extVend=CFG.vendedores_externos||[];
   document.getElementById('config-grid').innerHTML=`
     <div class="config-card">
@@ -2713,6 +2774,7 @@ async function registrarStockMarca(){
     fd.append('precio_venta',String(precio));
     fd.append('notas',document.getElementById('sf-notas').value);
     fd.append('tallas_json',JSON.stringify(tallas));
+    fd.append('quality', String(getPhotoQuality()));
     var r=await fetch(API+'/pos/stock-marcas',{method:'POST',body:fd});
     var d=await r.json();
     if(!r.ok) throw new Error(d.detail||'Error');
@@ -2797,7 +2859,8 @@ function handleStockDelete(btn){
 }
 
 async function eliminarStockItem(rowIndex, nombre){
-  if(!confirm('¿Eliminar "'+nombre+'" del stock?\n\nEsta acción no se puede deshacer.')) return;
+  var ok = await showConfirm('Eliminar producto', '¿Eliminar "'+nombre+'" del stock? Esta acción no se puede deshacer.', 'Eliminar');
+  if(!ok) return;
   try{
     var r = await fetch(API+'/pos/stock-marcas/'+rowIndex, {method:'DELETE'});
     if(!r.ok) throw new Error('Error al eliminar');
@@ -3055,6 +3118,7 @@ async function registrarConsignacion(){
     fd.append('email', document.getElementById('cf-email').value);
     fd.append('telefono', document.getElementById('cf-tel').value);
     fd.append('notas', document.getElementById('cf-notas').value);
+    fd.append('quality', String(getPhotoQuality()));
 
     var r = await fetch(API+'/pos/consignacion', {method:'POST', body:fd});
     var d = await r.json();
@@ -3202,6 +3266,18 @@ setInterval(async () => {
         Confirmar link →
       </button>
       <button class="match-skip-btn" onclick="cerrarMatchModal()">Sin link</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="confirm-modal" id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Confirmar</div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirm(false)">Cancelar</button>
+      <button class="confirm-ok danger" id="confirm-ok-btn" onclick="closeConfirm(true)">Eliminar</button>
     </div>
   </div>
 </div>
