@@ -2661,6 +2661,7 @@ function resetFoto() {
 // ── MATCH CONSIGNACION ────────────────────────────────────────────────────────
 var _matchRowIndex = null;
 var _matchSelected = null;
+var _linkedTitles = {};  // cache: gid -> title
 
 async function buscarMatchConsignacion(rowIndex, nombre){
   _matchRowIndex = rowIndex;
@@ -2970,9 +2971,16 @@ function renderInventario(){
       // Actions based on estado
       var actions = '';
       if(c.estado==='Activa'){
-        var linked = c.shopify_gid
-          ? '<span style="font-size:9px;color:#2d6a4f">✓ Linkeado</span>'
-          : '<button class="link-shopify-btn" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleLinkBtn(this)">↗ Linkear Shopify</button>';
+        if(c.shopify_gid){
+          // Show linked product title from cache if available
+          var linkedTitle = _linkedTitles[c.shopify_gid] || c.shopify_gid.split('/').pop();
+          linked = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+            +'<span style="font-size:9px;color:#2d6a4f">✓ '+esc(linkedTitle)+'</span>'
+            +'<button class="link-shopify-btn" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleLinkBtn(this)" style="font-size:8px;padding:2px 6px">Cambiar</button>'
+            +'</div>';
+        } else {
+          linked = '<button class="link-shopify-btn" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleLinkBtn(this)">↗ Linkear Shopify</button>';
+        }
         actions = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
           +linked
           +'</div>';
@@ -3476,6 +3484,20 @@ async function loadConsignaciones(){
     if(badgeVendidas) badgeVendidas.textContent=d.vendidas.length;
     document.getElementById('inv-badge').textContent=(stockData.length||0)+d.activas.length;
     if(document.getElementById('page-inventario').classList.contains('active')) renderInventario();
+    // Fetch titles for linked consignaciones
+    var allConsigs = (d.activas||[]).concat(d.vendidas||[]).concat(d.pagadas||[]);
+    allConsigs.forEach(function(c){
+      if(c.shopify_gid && !_linkedTitles[c.shopify_gid]){
+        fetch(API+'/pos/shopify-product-title?gid='+encodeURIComponent(c.shopify_gid))
+          .then(function(r){ return r.json(); })
+          .then(function(d){ 
+            if(d.title){ 
+              _linkedTitles[c.shopify_gid] = d.title;
+              if(document.getElementById('page-inventario').classList.contains('active')) renderInventario();
+            }
+          }).catch(function(){});
+      }
+    });
   }catch(e){
     console.warn('Error cargando consignaciones:',e);
   }

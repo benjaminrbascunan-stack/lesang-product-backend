@@ -698,6 +698,21 @@ async def marcar_vendida(row_index: int, order_name: str = ""):
 
 
 
+
+@app.get("/pos/shopify-product-title")
+async def get_shopify_product_title(gid: str):
+    """Obtiene el titulo de un producto de Shopify por GID."""
+    try:
+        query = """
+        query GetProduct($id: ID!) {
+          product(id: $id) { id title }
+        }"""
+        data = await gql(query, {"id": gid})
+        title = data.get("product", {}).get("title", "")
+        return {"title": title}
+    except Exception as e:
+        return {"title": "", "error": str(e)}
+
 @app.get("/pos/consignacion/buscar-match")
 async def buscar_match_shopify(q: str):
     """Busca productos en Shopify por nombre para linkear con consignación."""
