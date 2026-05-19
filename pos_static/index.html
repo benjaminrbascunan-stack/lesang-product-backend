@@ -2790,6 +2790,12 @@ async function actualizarStockItem(rowIndex){
   btn.onclick = registrarStockMarca;
 }
 
+function handleStockDelete(btn){
+  var row = parseInt(btn.getAttribute('data-row'));
+  var nombre = btn.getAttribute('data-nombre');
+  eliminarStockItem(row, nombre);
+}
+
 async function eliminarStockItem(rowIndex, nombre){
   if(!confirm('¿Eliminar "'+nombre+'" del stock?\n\nEsta acción no se puede deshacer.')) return;
   try{
@@ -2846,7 +2852,7 @@ function renderStockMarcas(){
         +'</div>'
         +'<div style="display:flex;gap:6px;padding:8px 12px 10px">'
         +'<button class="stock-edit-btn" onclick="editarStockItem('+item.row_index+')">Editar</button>'
-        +'<button class="stock-del-btn" data-nombre="'+esc(item.nombre_prenda)+'" onclick="eliminarStockItem('+item.row_index+',this.getAttribute(\"data-nombre\"))">✕ Eliminar</button>'
+        +'<button class="stock-del-btn" data-row="'+item.row_index+'" data-nombre="'+esc(item.nombre_prenda)+'" onclick="handleStockDelete(this)">✕ Eliminar</button>'
         +'</div>'
         +'</div>';
     }).join('')+'</div>';
