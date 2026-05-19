@@ -2783,7 +2783,7 @@ async function confirmarMatch(){
     if(!r.ok) throw new Error('Error al linkear');
     toast('Consignación linkeada con Shopify ✓','ok');
     cerrarMatchModal();
-    // consignaciones y stock cargan lazy al abrir la pestaña
+    await loadConsignaciones();
   }catch(e){
     toast(e.message,'err');
     btn.textContent='Confirmar link →';btn.disabled=false;
@@ -2885,9 +2885,8 @@ function renderInventario(){
         +'<div class="consig-body">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
         +'<span class="consig-badge-estado '+estadoCls+'">'+c.estado+'</span>'
-        +'<div style="display:flex;gap:4px">'
-        +'<button class="stock-del-btn" style="font-size:8px;padding:2px 6px" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleConsigDelete(this)" title="Eliminar">✕</button>'
-        +'</div></div>'
+        +'<button class="stock-del-btn" style="font-size:9px;padding:3px 8px" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleConsigDelete(this)">✕ Eliminar</button>'
+        +'</div>'
         +'<div class="consig-nombre">'+esc(c.nombre_prenda)+(c.talla?' <span style="color:var(--gray4);font-weight:400;font-size:10px">'+c.talla+'</span>':'')+'</div>'
         +'<div class="consig-dueno">'+esc(c.dueno)+(c.instagram?' · '+esc(c.instagram):'')+'</div>'
         +'<div class="consig-meta">'
