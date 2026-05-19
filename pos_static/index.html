@@ -993,6 +993,76 @@ nav{
   letter-spacing:.1em;cursor:pointer;
 }
 .confirm-ok.danger{background:#cc3300}
+
+/* ══ GASTOS ══ */
+#page-gastos{flex-direction:column;overflow:hidden;background:var(--gray1)}
+.gastos-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;border-bottom:1px solid var(--gray2);
+  background:var(--white);flex-shrink:0;height:48px;
+}
+.gastos-tabs{display:flex;height:100%}
+.gtab{
+  height:100%;padding:0 20px;background:transparent;border:none;
+  border-bottom:2px solid transparent;font-family:var(--font);
+  font-size:10px;font-weight:500;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--gray4);cursor:pointer;transition:var(--transition);
+}
+.gtab.active{color:var(--text);border-bottom-color:var(--orange)}
+.gastos-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.gasto-form-wrap{
+  max-width:560px;margin:0 auto;padding:20px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.gasto-row{
+  background:var(--white);border:1px solid var(--gray2);
+  padding:12px 16px;display:flex;align-items:center;gap:12px;
+}
+.gasto-cat{
+  font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--white);background:var(--black);
+  padding:3px 8px;white-space:nowrap;
+}
+.gasto-desc{flex:1;font-size:11px;color:var(--gray4)}
+.gasto-monto{font-size:14px;font-weight:700;white-space:nowrap}
+.gasto-fecha{font-size:9px;color:var(--gray3);white-space:nowrap}
+.gastos-total-bar{
+  background:var(--white);border-top:1px solid var(--gray2);
+  padding:14px 20px;display:flex;justify-content:space-between;
+  align-items:center;flex-shrink:0;
+}
+.cierre-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  padding:16px;max-width:700px;margin:0 auto;
+}
+.cierre-card{
+  background:var(--white);border:1px solid var(--gray2);
+  padding:16px;
+}
+.cierre-label{
+  font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--gray4);margin-bottom:6px;
+}
+.cierre-valor{font-size:22px;font-weight:700}
+.cierre-valor.positivo{color:#2d6a4f}
+.cierre-valor.negativo{color:#cc3300}
+.cierre-desglose{
+  background:var(--white);border:1px solid var(--gray2);
+  margin:0 16px 16px;max-width:700px;
+}
+.cierre-desglose-row{
+  display:flex;justify-content:space-between;
+  padding:8px 14px;border-bottom:1px solid var(--gray1);
+  font-size:10px;
+}
+.cierre-desglose-row:last-child{border-bottom:none}
+.cierre-desglose-row.total{
+  font-weight:700;background:var(--gray1);
+  border-top:1px solid var(--gray2);
+}
+@media(max-width:768px){
+  .cierre-grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -1195,13 +1265,16 @@ nav{
   <div id="inv-content" class="inv-content"></div>
 </div>
 
-<!-- PAGE: GASTOS (placeholder) -->
+<!-- PAGE: GASTOS -->
 <div class="page" id="page-gastos">
-  <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:12px;color:var(--gray4)">
-    <svg width="40" height="40" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-    <div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase">Módulo de gastos</div>
-    <div style="font-size:11px;color:var(--gray3)">Próximamente</div>
+  <div class="gastos-header">
+    <div class="gastos-tabs">
+      <button class="gtab active" id="gtab-ingresar" onclick="switchGastosTab('ingresar',this)">Ingresar Gasto</button>
+      <button class="gtab" id="gtab-resumen" onclick="switchGastosTab('resumen',this)">Resumen del Mes</button>
+    </div>
+    <span id="gastos-mes-label" style="font-size:9px;color:var(--gray4);letter-spacing:.1em"></span>
   </div>
+  <div class="gastos-body" id="gastos-body"></div>
 </div>
 
 <!-- Formulario entrada stock -->
@@ -2375,6 +2448,7 @@ function goTo(name,btn){
   if(name==='config') renderConfigPage();
   if(name==='resumenes') initResumenes();
   if(name==='inventario') initInventario();
+  if(name==='gastos') initGastos();
   var fab=document.getElementById('sheet-fab');
   if(fab) fab.style.display = (name==='pos' && isMobile()) ? 'flex' : 'none';
   // Update inv add button label
@@ -3360,6 +3434,193 @@ async function confirmarStockVenta(){
     btn.textContent='Confirmar venta →'; btn.disabled=false;
     _stockVentaProcessing = false;
   }
+}
+
+
+// ── GASTOS ────────────────────────────────────────────────────────────────────
+var gastosData   = [];
+var gastosTotal  = 0;
+var gastosBycat  = {};
+var _gastosTab   = 'ingresar';
+var MESES_LIST   = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+var CATEGORIAS   = ['Luz','Internet','Agua','Alarma','Aseo','Arriendo',
+                    'Gastos Comunes','Ropa Comprada','Gastos Tienda Internos',
+                    'Honorarios Marenna','Honorarios Michelle','Otro'];
+
+async function initGastos(){
+  var lbl = document.getElementById('gastos-mes-label');
+  if(lbl) lbl.textContent = MES.toUpperCase();
+  await loadGastos();
+}
+
+async function loadGastos(){
+  try{
+    var r = await fetch(API+'/pos/gastos/'+MES);
+    var d = await r.json();
+    gastosData  = d.gastos||[];
+    gastosTotal = d.total||0;
+    gastosBycat = d.by_categoria||{};
+    renderGastos();
+  }catch(e){ console.warn('Error gastos:',e); }
+}
+
+function switchGastosTab(tab, btn){
+  _gastosTab = tab;
+  document.querySelectorAll('.gtab').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderGastos();
+}
+
+function renderGastos(){
+  var body = document.getElementById('gastos-body');
+  if(!body) return;
+  if(_gastosTab === 'ingresar'){
+    renderGastosForm(body);
+  } else {
+    renderGastosResumen(body);
+  }
+}
+
+function renderGastosForm(body){
+  var mesOptions = MESES_LIST.map(function(m){
+    return '<option value="'+m+'"'+(m===MES?' selected':'')+'>'+m+'</option>';
+  }).join('');
+  var catOptions = CATEGORIAS.map(function(c){
+    return '<option value="'+c+'">'+c+'</option>';
+  }).join('');
+
+  body.innerHTML = '<div class="gasto-form-wrap">'
+    // Form
+    +'<div style="background:var(--white);border:1px solid var(--gray2);padding:16px;display:flex;flex-direction:column;gap:10px">'
+    +'<div style="font-size:9px;font-weight:600;letter-spacing:.25em;text-transform:uppercase;color:var(--gray4);padding-bottom:8px;border-bottom:1px solid var(--gray2)">Nuevo gasto</div>'
+    +'<div class="frow">'
+    +'<div class="fgrp"><label class="flabel">Mes</label>'
+    +'<select class="fsel" id="gf-mes">'+mesOptions+'</select></div>'
+    +'<div class="fgrp"><label class="flabel">Categoría *</label>'
+    +'<select class="fsel" id="gf-cat">'+catOptions+'</select></div>'
+    +'</div>'
+    +'<div class="fgrp"><label class="flabel">Descripción</label>'
+    +'<input class="finput" type="text" id="gf-desc" placeholder="Ej: Factura Enel Mayo"></div>'
+    +'<div class="frow">'
+    +'<div class="fgrp"><label class="flabel">Monto (CLP) *</label>'
+    +'<div class="price-wrap"><span class="price-pre">$</span>'
+    +'<input class="finput" type="number" id="gf-monto" placeholder="0"></div></div>'
+    +'<div class="fgrp"><label class="flabel">Notas</label>'
+    +'<input class="finput" type="text" id="gf-notas" placeholder="Opcional"></div>'
+    +'</div>'
+    +'<button class="consig-submit-btn" onclick="registrarGasto()">Registrar gasto →</button>'
+    +'</div>'
+
+    // List
+    +'<div style="font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4);margin-top:8px">'+MES+' — '+gastosData.length+' gastos</div>'
+    +(gastosData.length ? '' : '<div style="padding:20px;text-align:center;color:var(--gray4);font-size:10px">Sin gastos registrados</div>')
+    +gastosData.map(function(g){
+      return '<div class="gasto-row">'
+        +'<span class="gasto-cat">'+esc(g.categoria)+'</span>'
+        +'<div class="gasto-desc">'+esc(g.descripcion||'—')+'</div>'
+        +'<div class="gasto-monto">$'+fmt(g.monto)+'</div>'
+        +'<div class="gasto-fecha">'+esc(g.fecha.split(' ')[0])+'</div>'
+        +'<button class="stock-del-btn" style="font-size:9px;padding:2px 6px" data-row="'+g.row_index+'" onclick="eliminarGasto(this)">✕</button>'
+        +'</div>';
+    }).join('')
+
+    +'<div class="gastos-total-bar">'
+    +'<span style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gray4)">Total gastos '+MES+'</span>'
+    +'<span style="font-size:18px;font-weight:700">$'+fmt(gastosTotal)+'</span>'
+    +'</div>'
+    +'</div>';
+}
+
+async function registrarGasto(){
+  var mes   = document.getElementById('gf-mes').value;
+  var cat   = document.getElementById('gf-cat').value;
+  var monto = parseFloat(document.getElementById('gf-monto').value)||0;
+  if(!monto){ toast('Ingresa un monto','err'); return; }
+  var btn = document.querySelector('#gastos-body .consig-submit-btn');
+  if(btn){ btn.textContent='Registrando...'; btn.disabled=true; }
+  try{
+    var fd = new FormData();
+    fd.append('mes', mes);
+    fd.append('categoria', cat);
+    fd.append('descripcion', document.getElementById('gf-desc').value);
+    fd.append('monto', String(monto));
+    fd.append('notas', document.getElementById('gf-notas').value);
+    var r = await fetch(API+'/pos/gastos', {method:'POST', body:fd});
+    if(!r.ok) throw new Error('Error al registrar');
+    toast('Gasto registrado ✓','ok');
+    document.getElementById('gf-monto').value='';
+    document.getElementById('gf-desc').value='';
+    document.getElementById('gf-notas').value='';
+    await loadGastos();
+  }catch(e){ toast(e.message,'err'); }
+  if(btn){ btn.textContent='Registrar gasto →'; btn.disabled=false; }
+}
+
+async function eliminarGasto(btn){
+  var row = parseInt(btn.getAttribute('data-row'));
+  var ok = await showConfirm('Eliminar gasto','¿Eliminar este gasto? Esta acción no se puede deshacer.','Eliminar');
+  if(!ok) return;
+  try{
+    var r = await fetch(API+'/pos/gastos/'+row, {method:'DELETE'});
+    if(!r.ok) throw new Error('Error');
+    toast('Gasto eliminado','ok');
+    await loadGastos();
+  }catch(e){ toast(e.message,'err'); }
+}
+
+function renderGastosResumen(body){
+  // Get ingreso neto from historial
+  var ingresoNeto = histData && histData.resumen ? (histData.resumen.total_neto||0) : 0;
+  var saldo = ingresoNeto - gastosTotal;
+  var saldoCls = saldo >= 0 ? 'positivo' : 'negativo';
+
+  var html = '<div style="padding:16px;max-width:700px;margin:0 auto">'
+
+    // Summary cards
+    +'<div class="cierre-grid">'
+    +'<div class="cierre-card">'
+    +'<div class="cierre-label">Ingresos netos '+MES+'</div>'
+    +'<div class="cierre-valor positivo">$'+fmt(Math.round(ingresoNeto))+'</div>'
+    +'<div style="font-size:9px;color:var(--gray4);margin-top:4px">Desde ventas POS</div>'
+    +'</div>'
+    +'<div class="cierre-card">'
+    +'<div class="cierre-label">Gastos '+MES+'</div>'
+    +'<div class="cierre-valor negativo">$'+fmt(Math.round(gastosTotal))+'</div>'
+    +'<div style="font-size:9px;color:var(--gray4);margin-top:4px">'+gastosData.length+' gastos registrados</div>'
+    +'</div>'
+    +'<div class="cierre-card" style="grid-column:1/-1;border-color:'+(saldo>=0?'#a8d8b0':'#ffb3a7')+'">'
+    +'<div class="cierre-label">Saldo del mes</div>'
+    +'<div class="cierre-valor '+saldoCls+'">$'+fmt(Math.round(Math.abs(saldo)))+'</div>'
+    +'<div style="font-size:10px;color:var(--gray4);margin-top:2px">'+(saldo>=0?'Superavit':'Deficit')+'</div>'
+    +'</div>'
+    +'</div>'
+
+    // Desglose por categoría
+    +'<div style="font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4);margin:8px 0 6px">Desglose por categoría</div>'
+    +'<div class="cierre-desglose">';
+
+  var cats = Object.keys(gastosBycat).sort(function(a,b){return gastosBycat[b]-gastosBycat[a];});
+  if(!cats.length){
+    html += '<div class="cierre-desglose-row" style="color:var(--gray4);justify-content:center">Sin gastos registrados</div>';
+  } else {
+    cats.forEach(function(cat){
+      var pct = gastosTotal > 0 ? Math.round((gastosBycat[cat]/gastosTotal)*100) : 0;
+      html += '<div class="cierre-desglose-row">'
+        +'<span>'+esc(cat)+'</span>'
+        +'<div style="display:flex;gap:12px;align-items:center">'
+        +'<span style="font-size:9px;color:var(--gray4)">'+pct+'%</span>'
+        +'<span style="font-weight:600">$'+fmt(Math.round(gastosBycat[cat]))+'</span>'
+        +'</div></div>';
+    });
+    html += '<div class="cierre-desglose-row total">'
+      +'<span>Total</span><span>$'+fmt(Math.round(gastosTotal))+'</span></div>';
+  }
+  html += '</div></div>';
+
+  // Fix unclosed div
+  html = html.replace('</div>'+'</div>'+'</div>', '</div></div></div>');
+  body.innerHTML = html;
 }
 
 // ── CONSIGNACIONES ────────────────────────────────────────────────────────────

@@ -1001,3 +1001,144 @@ def delete_consignacion(row_index: int) -> bool:
         }}]}
     ).execute()
     return True
+
+
+# ── GASTOS ────────────────────────────────────────────────────────────────────
+
+GASTOS_HEADERS = [
+    "Mes",          # A
+    "Categoría",    # B
+    "Descripción",  # C
+    "Monto",        # D
+    "Fecha",        # E
+    "Notas",        # F
+]
+
+CATEGORIAS_FIJAS = [
+    "Luz", "Internet", "Agua", "Alarma", "Aseo",
+    "Arriendo", "Gastos Comunes", "Ropa Comprada",
+    "Gastos Tienda Internos", "Honorarios Marenna",
+    "Honorarios Michelle", "Otro",
+]
+
+
+def _ensure_gastos_sheet(sheets_svc, sid: str) -> int:
+    meta = sheets_svc.spreadsheets().get(spreadsheetId=sid).execute()
+    for s in meta["sheets"]:
+        if s["properties"]["title"] == "📊 Gastos":
+            return s["properties"]["sheetId"]
+    resp = sheets_svc.spreadsheets().batchUpdate(
+        spreadsheetId=sid,
+        body={"requests":[{"addSheet":{"properties":{
+            "title":"📊 Gastos",
+            "tabColor":{"red":1.0,"green":0.6,"blue":0.0},
+            "gridProperties":{"rowCount":1000,"columnCount":8}
+        }}}]}
+    ).execute()
+    gid = resp["replies"][0]["addSheet"]["properties"]["sheetId"]
+    # Headers
+    C_ORANGE = {"red":1.0,"green":0.6,"blue":0.0}
+    sheets_svc.spreadsheets().batchUpdate(
+        spreadsheetId=sid,
+        body={"requests":[
+            {"updateCells":{
+                "rows":[{"values":[
+                    {"userEnteredValue":{"stringValue":h},
+                     "userEnteredFormat":{
+                         "backgroundColor":C_BLACK,
+                         "textFormat":{"bold":True,"foregroundColor":C_WHITE,"fontSize":9},
+                         "horizontalAlignment":"CENTER","verticalAlignment":"MIDDLE"
+                     }} for h in GASTOS_HEADERS
+                ]}],
+                "fields":"userEnteredValue,userEnteredFormat",
+                "start":{"sheetId":gid,"rowIndex":0,"columnIndex":0}
+            }},
+            {"updateDimensionProperties":{
+                "range":{"sheetId":gid,"dimension":"ROWS","startIndex":0,"endIndex":1},
+                "properties":{"pixelSize":32},"fields":"pixelSize"
+            }},
+            {"updateSheetProperties":{
+                "properties":{"sheetId":gid,"gridProperties":{"frozenRowCount":1}},
+                "fields":"gridProperties.frozenRowCount"
+            }},
+        ]}
+    ).execute()
+    print(f"[Sheets] Hoja Gastos creada")
+    return gid
+
+
+def append_gasto(gasto: dict) -> dict:
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    _ensure_gastos_sheet(sheets, sid)
+    from datetime import datetime
+    fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
+    row = [
+        gasto.get("mes",""),
+        gasto.get("categoria",""),
+        gasto.get("descripcion",""),
+        float(gasto.get("monto",0)),
+        fecha,
+        gasto.get("notas",""),
+    ]
+    result = sheets.spreadsheets().values().get(
+        spreadsheetId=sid, range="📊 Gastos!A2:A",
+        majorDimension="COLUMNS",
+    ).execute()
+    existing = result.get("values",[[]])[0] if result.get("values") else []
+    next_row = len(existing) + 2
+    sheets.spreadsheets().values().update(
+        spreadsheetId=sid,
+        range=f"📊 Gastos!A{next_row}:F{next_row}",
+        valueInputOption="RAW",
+        body={"values":[row]},
+    ).execute()
+    return {"row": next_row}
+
+
+def get_gastos(mes: str) -> list:
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    try:
+        result = sheets.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="📊 Gastos!A2:F",
+            valueRenderOption="UNFORMATTED_VALUE",
+        ).execute()
+    except Exception:
+        return []
+    rows = result.get("values",[])
+    gastos = []
+    for i, row in enumerate(rows):
+        if not row or not any(row): continue
+        while len(row) < 6: row.append("")
+        if mes and str(row[0]).strip() != mes: continue
+        gastos.append({
+            "row_index":  i+2,
+            "mes":        str(row[0]),
+            "categoria":  str(row[1]),
+            "descripcion":str(row[2]),
+            "monto":      float(row[3]) if row[3] else 0,
+            "fecha":      str(row[4]),
+            "notas":      str(row[5]),
+        })
+    return gastos
+
+
+def delete_gasto(row_index: int) -> bool:
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    meta   = sheets.spreadsheets().get(spreadsheetId=sid).execute()
+    gid    = next(s["properties"]["sheetId"] for s in meta["sheets"]
+                  if s["properties"]["title"] == "📊 Gastos")
+    sheets.spreadsheets().batchUpdate(
+        spreadsheetId=sid,
+        body={"requests":[{"deleteDimension":{
+            "range":{"sheetId":gid,"dimension":"ROWS",
+                     "startIndex":row_index-1,"endIndex":row_index}
+        }}]}
+    ).execute()
+    return True

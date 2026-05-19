@@ -1026,6 +1026,55 @@ async def vender_stock_marca(row_index: int, venta: VentaIn):
         "neto_tienda": v["neto_tienda"],
     }
 
+
+# ── Gastos ────────────────────────────────────────────────────────────────────
+@app.get("/pos/gastos/categorias")
+def get_categorias_gastos():
+    from pos_sheets import CATEGORIAS_FIJAS
+    return {"categorias": CATEGORIAS_FIJAS}
+
+@app.post("/pos/gastos")
+async def crear_gasto(
+    mes:         str = FastForm(...),
+    categoria:   str = FastForm(...),
+    descripcion: str = FastForm(""),
+    monto:       str = FastForm(...),
+    notas:       str = FastForm(""),
+):
+    try:
+        from pos_sheets import append_gasto
+        result = append_gasto({
+            "mes": mes, "categoria": categoria,
+            "descripcion": descripcion,
+            "monto": float(monto), "notas": notas,
+        })
+        return {"success": True, "row": result.get("row")}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.get("/pos/gastos/{mes}")
+def listar_gastos(mes: str):
+    try:
+        from pos_sheets import get_gastos
+        gastos = get_gastos(mes)
+        total = sum(g["monto"] for g in gastos)
+        by_cat = {}
+        for g in gastos:
+            cat = g["categoria"]
+            by_cat[cat] = by_cat.get(cat, 0) + g["monto"]
+        return {"gastos": gastos, "total": total, "by_categoria": by_cat}
+    except Exception as e:
+        return {"gastos": [], "total": 0, "by_categoria": {}, "error": str(e)}
+
+@app.delete("/pos/gastos/{row_index}")
+def eliminar_gasto(row_index: int):
+    try:
+        from pos_sheets import delete_gasto
+        delete_gasto(row_index)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 # ── Servir el POS frontend ────────────────────────────────────────────────────
 app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")
 
