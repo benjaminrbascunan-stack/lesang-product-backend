@@ -756,6 +756,7 @@ nav{
 }
 .estado-activa{background:#e8f5e9;color:#2d6a4f;border:1px solid #a8d8b0}
 .estado-vendida{background:var(--gray1);color:var(--gray4);border:1px solid var(--gray2)}
+.estado-pagada{background:#e8f5e9;color:#1a5c2a;border:1px solid #a8d8b0}
 
 /* Formulario nueva consignación */
 .consig-form-overlay{
@@ -2668,6 +2669,9 @@ async function buscarMatchConsignacion(rowIndex, nombre){
   document.getElementById('match-list').innerHTML =
     '<div style="padding:20px;text-align:center;font-size:10px;color:var(--gray4)">Buscando en Shopify...</div>';
   document.getElementById('match-modal').classList.add('show');
+  // Pre-fill search bar
+  var searchEl = document.getElementById('match-search');
+  if(searchEl && nombre) searchEl.value = nombre;
 
   try{
     // Usar las primeras 2-3 palabras para buscar
@@ -2685,10 +2689,11 @@ async function buscarMatchConsignacion(rowIndex, nombre){
       var img = p.image
         ? '<img class="match-img" src="'+shopifyThumb(p.image,'100x100')+'">'
         : '<div class="match-img"></div>';
-      return '<div class="match-item" data-gid="'+p.id+'" onclick="selectMatch(this)">'
+      var stockWarn = (p.stock<=0) ? ' <span style="color:#cc3300;font-size:9px">Sin stock</span>' : '';
+      return '<div class="match-item" data-gid="'+p.id+'" data-stock="'+p.stock+'" onclick="selectMatch(this)">'
         +img
         +'<div class="match-info">'
-        +'<div class="match-name">'+esc(p.title)+'</div>'
+        +'<div class="match-name">'+esc(p.title)+stockWarn+'</div>'
         +'<div class="match-price">$'+fmt(p.price)+' CLP</div>'
         +'<div class="match-stock">Stock: '+(p.stock||0)+'</div>'
         +'</div>'
@@ -2699,6 +2704,57 @@ async function buscarMatchConsignacion(rowIndex, nombre){
     document.getElementById('match-list').innerHTML =
       '<div style="padding:20px;text-align:center;font-size:10px;color:#cc3300">Error: '+e.message+'</div>';
   }
+}
+
+
+function handlePagarConsig(btn){
+  var row = parseInt(btn.getAttribute('data-row'));
+  var dueno = btn.getAttribute('data-dueno');
+  marcarPagadaConsig(row, dueno);
+}
+
+function handleConsigDelete(btn){
+  var row = parseInt(btn.getAttribute('data-row'));
+  var nombre = btn.getAttribute('data-nombre');
+  showConfirm(
+    'Eliminar consignación',
+    '¿Eliminar "'+nombre+'" completamente? Esta acción no se puede deshacer.',
+    'Eliminar'
+  ).then(function(ok){
+    if(!ok) return;
+    fetch(API+'/pos/consignacion/'+row, {method:'DELETE'})
+      .then(function(r){ if(!r.ok) throw new Error('Error'); return r.json(); })
+      .then(function(){ toast('Consignación eliminada','ok'); loadConsignaciones(); })
+      .catch(function(e){ toast(e.message,'err'); });
+  });
+}
+
+async function marcarPagadaConsig(rowIndex, dueno){
+  var ok = await showConfirm(
+    'Marcar como pagado',
+    '¿Confirmas que pagaste a '+dueno+'? Esto quedará registrado.',
+    'Confirmar pago'
+  );
+  if(!ok) return;
+  try{
+    var r = await fetch(API+'/pos/consignacion/'+rowIndex+'/pagada', {method:'PATCH'});
+    if(!r.ok) throw new Error('Error');
+    toast('Pago registrado ✓','ok');
+    await loadConsignaciones();
+  }catch(e){ toast(e.message,'err'); }
+}
+
+var _matchSearchTimeout = null;
+function onMatchSearch(val){
+  clearTimeout(_matchSearchTimeout);
+  if(!val.trim()) return;
+  _matchSearchTimeout = setTimeout(function(){ buscarMatchConsignacion(_matchRowIndex, val); }, 500);
+}
+
+function buscarManual(){
+  var val = document.getElementById('match-search').value.trim();
+  if(!val){ toast('Escribe un nombre para buscar','err'); return; }
+  buscarMatchConsignacion(_matchRowIndex, val);
 }
 
 function handleLinkBtn(btn){
@@ -2795,7 +2851,7 @@ function renderInventario(){
     container.innerHTML = html;
 
   } else {
-    var list = (consigData.activas||[]).concat(consigData.vendidas||[]);
+    var list = (consigData.activas||[]).concat(consigData.vendidas||[]).concat(consigData.pagadas||[]);
     if(!list.length){
       container.innerHTML='<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em;text-transform:uppercase">Sin consignaciones</div>';
       return;
@@ -2805,15 +2861,33 @@ function renderInventario(){
       var foto = c.foto_link
         ? '<img class="consig-foto" src="'+driveThumb(c.foto_link)+'" onclick="openImgModal(this.src)">'
         : '<div class="consig-foto-ph"><svg width="20" height="20" viewBox="0 0 24 24" stroke="var(--gray3)" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
-      var estadoCls = c.estado==='Activa'?'estado-activa':'estado-vendida';
+      var estadoCls = c.estado==='Activa'?'estado-activa':(c.estado==='Pagada'?'estado-pagada':'estado-vendida');
       var ganancia = c.precio_venta - c.valor_acordado;
-      var linked = c.shopify_gid
-        ? '<span style="font-size:9px;color:#2d6a4f;letter-spacing:.05em">✓ Linkeado con Shopify</span>'
-        : '<button class="link-shopify-btn" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleLinkBtn(this)">↗ Linkear Shopify</button>';
+      // Actions based on estado
+      var actions = '';
+      if(c.estado==='Activa'){
+        var linked = c.shopify_gid
+          ? '<span style="font-size:9px;color:#2d6a4f">✓ Linkeado</span>'
+          : '<button class="link-shopify-btn" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleLinkBtn(this)">↗ Linkear Shopify</button>';
+        actions = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+          +linked
+          +'</div>';
+      } else if(c.estado==='Vendida'){
+        actions = '<div style="display:flex;gap:6px;margin-top:4px">'
+          +'<button class="stock-edit-btn" style="flex:none;padding:5px 10px" data-row="'+c.row_index+'" data-dueno="'+esc(c.dueno)+'" onclick="handlePagarConsig(this)">✓ Marcar pagado a dueño</button>'
+          +'</div>';
+      } else if(c.estado==='Pagada'){
+        actions = '<span style="font-size:9px;color:#2d6a4f;letter-spacing:.05em">✓ Pagado al dueño</span>';
+      }
+
       html2 += '<div class="consig-card">'
         +foto
         +'<div class="consig-body">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
         +'<span class="consig-badge-estado '+estadoCls+'">'+c.estado+'</span>'
+        +'<div style="display:flex;gap:4px">'
+        +'<button class="stock-del-btn" style="font-size:8px;padding:2px 6px" data-row="'+c.row_index+'" data-nombre="'+esc(c.nombre_prenda)+'" onclick="handleConsigDelete(this)" title="Eliminar">✕</button>'
+        +'</div></div>'
         +'<div class="consig-nombre">'+esc(c.nombre_prenda)+(c.talla?' <span style="color:var(--gray4);font-weight:400;font-size:10px">'+c.talla+'</span>':'')+'</div>'
         +'<div class="consig-dueno">'+esc(c.dueno)+(c.instagram?' · '+esc(c.instagram):'')+'</div>'
         +'<div class="consig-meta">'
@@ -2828,7 +2902,7 @@ function renderInventario(){
         +'<div class="consig-price acordado"><div style="font-size:8px;color:var(--gray4);letter-spacing:.1em">PAGAR DUEÑO</div><span>$'+fmt(c.valor_acordado)+'</span></div>'
         +'<div class="consig-price"><div style="font-size:8px;color:var(--gray4);letter-spacing:.1em">GANANCIA</div><span style="color:#2d6a4f">$'+fmt(ganancia)+'</span></div>'
         +'</div>'
-        +(c.estado==='Activa'?'<div style="margin-top:8px">'+linked+'</div>':'')
+        +(actions?'<div style="margin-top:8px">'+actions+'</div>':'')
         +'</div></div>';
     });
     html2 += '</div>';
@@ -3288,7 +3362,7 @@ async function loadConsignaciones(){
   try{
     var r=await fetch(API+'/pos/consignaciones');
     var d=await r.json();
-    consigData=d;
+    consigData={activas:d.activas||[],vendidas:d.vendidas||[],pagadas:d.pagadas||[]};
     document.getElementById('consig-badge').textContent=d.activas.length;
     var badgeActivas=document.getElementById('badge-activas');
     var badgeVendidas=document.getElementById('badge-vendidas');
@@ -3323,7 +3397,7 @@ function renderConsignaciones(){
     var foto = c.foto_link
       ? '<img class="consig-foto" src="'+c.foto_link+'" onclick="openImgModal(this.src)">'
       : '<div class="consig-foto-ph"><svg width="20" height="20" viewBox="0 0 24 24" stroke="var(--gray3)" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
-    var estadoCls = c.estado==='Activa'?'estado-activa':'estado-vendida';
+    var estadoCls = c.estado==='Activa'?'estado-activa':(c.estado==='Pagada'?'estado-pagada':'estado-vendida');
     var ganancia = c.precio_venta - c.valor_acordado;
 
     return '<div class="consig-card">'
@@ -3402,8 +3476,17 @@ setInterval(async () => {
         <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
-    <div style="padding:10px 12px 0;font-size:10px;color:var(--gray4)">
-      Selecciona el producto de Shopify que corresponde a esta consignación:
+    <div style="padding:10px 12px 6px">
+      <div style="display:flex;gap:6px">
+        <input class="finput" type="text" id="match-search" placeholder="Buscar producto en Shopify..." 
+          style="flex:1;font-size:12px" oninput="onMatchSearch(this.value)">
+        <button onclick="buscarManual()" style="padding:0 12px;background:var(--black);color:var(--white);border:none;font-family:var(--font);font-size:10px;cursor:pointer;letter-spacing:.1em">
+          Buscar
+        </button>
+      </div>
+      <div style="font-size:9px;color:var(--gray4);margin-top:6px;letter-spacing:.05em">
+        Resultados automáticos por nombre — o busca manualmente arriba
+      </div>
     </div>
     <div class="match-list" id="match-list"></div>
     <div class="match-actions">

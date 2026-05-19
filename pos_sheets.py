@@ -969,3 +969,35 @@ def descontar_talla(row_index: int, talla: str) -> bool:
         body={"values":[[new_total]]},
     ).execute()
     return True
+
+
+def marcar_consignacion_pagada(row_index: int) -> bool:
+    """Marca una consignación como Pagada."""
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    sheets.spreadsheets().values().update(
+        spreadsheetId=sid,
+        range=f"📦 Consignaciones!A{row_index}",
+        valueInputOption="RAW",
+        body={"values":[["Pagada"]]}
+    ).execute()
+    return True
+
+
+def delete_consignacion(row_index: int) -> bool:
+    """Elimina completamente una consignación del Sheet."""
+    creds  = get_creds()
+    sheets = build("sheets","v4",credentials=creds)
+    sid    = get_or_create_sheet()
+    meta   = sheets.spreadsheets().get(spreadsheetId=sid).execute()
+    gid    = next(s["properties"]["sheetId"] for s in meta["sheets"]
+                  if s["properties"]["title"] == "📦 Consignaciones")
+    sheets.spreadsheets().batchUpdate(
+        spreadsheetId=sid,
+        body={"requests":[{"deleteDimension":{
+            "range":{"sheetId":gid,"dimension":"ROWS",
+                     "startIndex":row_index-1,"endIndex":row_index}
+        }}]}
+    ).execute()
+    return True

@@ -681,7 +681,8 @@ def get_consignaciones():
         consigs = get_consignaciones()
         activas  = [c for c in consigs if c["estado"] == "Activa"]
         vendidas = [c for c in consigs if c["estado"] == "Vendida"]
-        return {"activas": activas, "vendidas": vendidas, "total": len(consigs)}
+        pagadas  = [c for c in consigs if c["estado"] == "Pagada"]
+        return {"activas": activas, "vendidas": vendidas, "pagadas": pagadas, "total": len(consigs)}
     except Exception as e:
         return {"activas":[],"vendidas":[],"total":0,"error":str(e)}
 
@@ -700,28 +701,31 @@ async def marcar_vendida(row_index: int, order_name: str = ""):
 @app.get("/pos/consignacion/buscar-match")
 async def buscar_match_shopify(q: str):
     """Busca productos en Shopify por nombre para linkear con consignación."""
-    query = """
+    gql_query = """
     query SearchProducts($q: String!) {
       products(first: 8, query: $q) {
         edges { node {
-          id title
+          id title status
           featuredImage { url }
           variants(first:1) { edges { node { price inventoryQuantity } } }
         }}
       }
     }"""
     try:
-        data = await gql(query, {"q": q})
+        data = await gql(gql_query, {"q": q})
         products = []
         for e in data["products"]["edges"]:
             n = e["node"]
             v = n["variants"]["edges"][0]["node"] if n["variants"]["edges"] else {}
+            qty = v.get("inventoryQuantity", 0) or 0
             products.append({
-                "id":     n["id"],
-                "title":  n["title"],
-                "image":  n["featuredImage"]["url"] if n.get("featuredImage") else None,
-                "price":  float(v.get("price",0)),
-                "stock":  v.get("inventoryQuantity",0),
+                "id":      n["id"],
+                "title":   n["title"],
+                "status":  n.get("status","ACTIVE"),
+                "image":   n["featuredImage"]["url"] if n.get("featuredImage") else None,
+                "price":   float(v.get("price",0)),
+                "stock":   qty,
+                "available": qty > 0,
             })
         return {"products": products}
     except Exception as e:
@@ -750,6 +754,26 @@ async def linkear_consignacion(row_index: int, shopify_gid: str):
 
 
 # ── Stock Marcas ──────────────────────────────────────────────────────────────
+
+@app.patch("/pos/consignacion/{row_index}/pagada")
+async def marcar_consig_pagada(row_index: int):
+    try:
+        from pos_sheets import marcar_consignacion_pagada
+        marcar_consignacion_pagada(row_index)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@app.delete("/pos/consignacion/{row_index}")
+async def eliminar_consignacion(row_index: int):
+    try:
+        from pos_sheets import delete_consignacion
+        delete_consignacion(row_index)
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.get("/pos/stock-marcas")
 def get_stock_marcas():
     try:
