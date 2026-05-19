@@ -2840,70 +2840,18 @@ function handlePagarConsig(btn){
   marcarPagadaConsig(row, dueno);
 }
 
-function editarConsig(rowIndex){
-  var all = (consigData.activas||[]).concat(consigData.vendidas||[]).concat(consigData.pagadas||[]);
-  var c = all.find(function(x){ return x.row_index===rowIndex; });
-  if(!c) return;
-  abrirFormConsig();
-  setTimeout(function(){
-    document.getElementById('cf-nombre').value = c.nombre_prenda||'';
-    document.getElementById('cf-talla').value  = c.talla||'';
-    document.getElementById('cf-precio').value = c.precio_venta||'';
-    document.getElementById('cf-acordado').value = c.valor_acordado||'';
-    document.getElementById('cf-dueno').value  = c.dueno||'';
-    document.getElementById('cf-ig').value     = c.instagram||'';
-    document.getElementById('cf-tel').value    = c.telefono||'';
-    document.getElementById('cf-email').value  = c.email||'';
-    document.getElementById('cf-notas').value  = c.notas||'';
-    var btn = document.getElementById('consig-submit-btn');
-    btn.textContent = 'Guardar cambios';
-    btn.onclick = function(){ actualizarConsig(rowIndex); };
-  }, 100);
-}
-
-async function actualizarConsig(rowIndex){
-  var nombre = document.getElementById('cf-nombre').value.trim();
-  var dueno  = document.getElementById('cf-dueno').value.trim();
-  var precio = document.getElementById('cf-precio').value;
-  var acordado = document.getElementById('cf-acordado').value;
-  if(!nombre||!dueno||!precio||!acordado){toast('Completa los campos obligatorios','err');return;}
-  var btn = document.getElementById('consig-submit-btn');
-  btn.textContent='Guardando...'; btn.disabled=true;
-  try{
-    var fd = new FormData();
-    fd.append('nombre_prenda', nombre);
-    fd.append('talla', document.getElementById('cf-talla').value);
-    fd.append('precio_venta', precio);
-    fd.append('valor_acordado', acordado);
-    fd.append('dueno', dueno);
-    fd.append('instagram', document.getElementById('cf-ig').value);
-    fd.append('telefono', document.getElementById('cf-tel').value);
-    fd.append('email', document.getElementById('cf-email').value);
-    fd.append('notas', document.getElementById('cf-notas').value);
-    var r = await fetch(API+'/pos/consignacion/'+rowIndex, {method:'PATCH', body:fd});
-    if(!r.ok) throw new Error('Error al actualizar');
-    toast('Consignacion actualizada','ok');
-    cerrarFormConsig();
-    await loadConsignaciones();
-  }catch(e){
-    toast(e.message,'err');
-  }
-  btn.textContent='Registrar consignacion'; btn.disabled=false;
-  btn.onclick = registrarConsignacion;
-}
-
-function handlePagarConsig(btn){
+function handleConsigDelete(btn){
   var row = parseInt(btn.getAttribute('data-row'));
   var nombre = btn.getAttribute('data-nombre');
   showConfirm(
-    'Eliminar consignación',
-    '¿Eliminar "'+nombre+'" completamente? Esta acción no se puede deshacer.',
+    'Eliminar consignacion',
+    'Eliminar "'+nombre+'" completamente? Esta accion no se puede deshacer.',
     'Eliminar'
   ).then(function(ok){
     if(!ok) return;
     fetch(API+'/pos/consignacion/'+row, {method:'DELETE'})
       .then(function(r){ if(!r.ok) throw new Error('Error'); return r.json(); })
-      .then(function(){ toast('Consignación eliminada','ok'); loadConsignaciones(); })
+      .then(function(){ toast('Consignacion eliminada','ok'); loadConsignaciones(); })
       .catch(function(e){ toast(e.message,'err'); });
   });
 }
@@ -3115,7 +3063,20 @@ var stockTabActual = 'catalogo';
 var TALLAS = ['XXS','XS','S','M','L','XL','XXL'];
 
 function abrirFormStock(){
-  // Populate marca select
+  // Reset form completely
+  var btn = document.getElementById('sf-submit-btn');
+  if(btn){ btn.textContent='Registrar entrada →'; btn.onclick=registrarStockMarca; btn.disabled=false; }
+  ['sf-nombre','sf-precio','sf-notas','sf-marca-nueva'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  TALLAS.forEach(function(t){ var el=document.getElementById('st-'+t); if(el) el.value='0'; });
+  stockFotoFile=null;
+  var preview=document.getElementById('sf-foto-preview');
+  if(preview) preview.classList.remove('show');
+  var fotoBtn=document.getElementById('sf-foto-btn');
+  if(fotoBtn) fotoBtn.classList.remove('has-foto');
+  var fotoLabel=document.getElementById('sf-foto-label');
+  if(fotoLabel) fotoLabel.textContent='Agregar foto referencial';
   var sel = document.getElementById('sf-marca');
   sel.innerHTML = '<option value="">Seleccionar...</option>';
   (CFG.marcas||[]).filter(function(m){return m.comision>0;}).forEach(function(m){
