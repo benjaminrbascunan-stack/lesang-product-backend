@@ -3744,17 +3744,19 @@ async function registrarConsignacion(){
     if(!r.ok) throw new Error(d.detail||'Error');
 
     hideUploadLoading(_cLoadingInterval);
-    toast('Consignacion registrada en Sheets ✓','ok');
+    toast('Consignacion registrada ✓','ok');
     cerrarFormConsig();
     // Limpiar form
     ['cf-nombre','cf-talla','cf-precio','cf-acordado','cf-dueno','cf-ig','cf-email','cf-tel','cf-notas','cf-marca-nueva']
-      .forEach(function(id){document.getElementById(id).value='';});
+      .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
     consigFotoFile=null;
-    document.getElementById('consig-foto-preview').classList.remove('show');
-    document.getElementById('consig-foto-btn').classList.remove('has-foto');
-    document.getElementById('consig-foto-label').textContent='Tomar foto de la prenda';
+    var cfp=document.getElementById('consig-foto-preview');if(cfp)cfp.classList.remove('show');
+    var cfb=document.getElementById('consig-foto-btn');if(cfb)cfb.classList.remove('has-foto');
+    var cfl=document.getElementById('consig-foto-label');if(cfl)cfl.textContent='Tomar foto de la prenda';
+    // Resetear boton
+    btn.textContent='Registrar consignacion →';btn.disabled=false;
     // Recargar lista
-    // consignaciones y stock cargan lazy al abrir la pestaña
+    await loadConsignaciones();
 
   }catch(e){
     hideUploadLoading(_cLoadingInterval);
