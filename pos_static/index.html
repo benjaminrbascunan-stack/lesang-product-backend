@@ -1210,7 +1210,7 @@ nav{
             <option>Efectivo</option>
             <option>Débito</option>
             <option>Crédito</option>
-            <option>Internet(Shopify)</option>
+            <option>SumUp</option>
           </select>
         </div>
       </div>
@@ -1378,8 +1378,8 @@ nav{
       <div class="consig-section-label" style="margin-bottom:8px">Tipo de pago</div>
       <select class="fsel" id="sv-pago" style="width:100%;margin-bottom:16px" onchange="if(stockSelectedTalla)selStockTalla({getAttribute:function(){return stockSelectedTalla}})">
         <option>Transferencia</option><option>Efectivo</option>
-        <option>Débito</option><option>Crédito</option><option>SumUp</option><option>SumUp</option>
-      </select>
+        <option>Transferencia</option><option>Efectivo</option>
+        <option>Débito</option><option>Crédito</option><option>SumUp</option>
       <div id="sv-calc" style="background:var(--gray1);padding:12px;margin-bottom:12px;font-size:10px"></div>
       <button class="consig-submit-btn" id="sv-submit" onclick="confirmarStockVenta()">
         Confirmar venta →
@@ -1789,6 +1789,15 @@ async function loadConfig(){
   try{
     const r=await fetch(`${API}/pos/config`);
     CFG=await r.json();
+    // Migrate: add SumUp if missing
+    if(!CFG.com_bancaria) CFG.com_bancaria={};
+    if(CFG.com_bancaria['SumUp']===undefined){
+      CFG.com_bancaria['SumUp']=0.01535;
+      if(!CFG.iva_tipos) CFG.iva_tipos=[];
+      if(CFG.iva_tipos.indexOf('SumUp')===-1) CFG.iva_tipos.push('SumUp');
+      await patchConfig({com_bancaria:CFG.com_bancaria,iva_tipos:CFG.iva_tipos});
+      console.log('[Config] SumUp agregado');
+    }
     populateSelects();
   }catch{toast('Error cargando config','err')}
 }
@@ -2291,7 +2300,7 @@ function editarVenta(venta){
       </div>
       <div class="edit-grp"><label class="flabel">Tipo de pago</label>
         <select class="fsel" id="e-pago">
-          ${['Transferencia','Efectivo','Débito','Crédito','Internet(Shopify)'].map(p=>`<option${p===venta.tipo_pago?' selected':''}>${p}</option>`).join('')}
+          ${['Transferencia','Efectivo','Débito','Crédito','Internet(Shopify)','SumUp'].map(p=>`<option${p===venta.tipo_pago?' selected':''}>${p}</option>`).join('')}
         </select>
       </div>
     </div>
