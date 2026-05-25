@@ -169,8 +169,9 @@ DEFAULT_CONFIG = {
     "com_bancaria": {
         "Débito": 0.0125, "Crédito": 0.0295,
         "Transferencia": 0, "Efectivo": 0, "Internet(Shopify)": 0.02,
+        "SumUp": 0.01535,
     },
-    "iva_tipos": ["Débito", "Crédito"],
+    "iva_tipos": ["Débito", "Crédito", "SumUp"],
 }
 
 def load_config() -> dict:

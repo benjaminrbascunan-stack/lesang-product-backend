@@ -1063,6 +1063,28 @@ nav{
 @media(max-width:768px){
   .cierre-grid{grid-template-columns:1fr}
 }
+
+/* ── Upload loading overlay ── */
+.upload-loading{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.85);z-index:3000;
+  flex-direction:column;align-items:center;justify-content:center;gap:16px;
+}
+.upload-loading.show{display:flex}
+.upload-loading-title{
+  color:#fff;font-size:11px;font-weight:600;
+  letter-spacing:.2em;text-transform:uppercase;
+}
+.upload-loading-msg{
+  color:rgba(255,255,255,.6);font-size:10px;letter-spacing:.1em;
+}
+.upload-progress-bar{
+  width:240px;height:3px;background:rgba(255,255,255,.2);
+}
+.upload-progress-fill{
+  height:100%;background:var(--orange);
+  transition:width .4s ease;width:0%;
+}
 </style>
 </head>
 <body>
@@ -1231,7 +1253,7 @@ nav{
 
     <!-- Foto de venta (opcional, solo celular) -->
     <div class="foto-section" id="foto-section">
-      <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none" onchange="onFotoSelected(this)">
+      <input type="file" id="foto-input" accept="image/*" style="display:none" onchange="onFotoSelected(this)">
       <button class="foto-btn" id="foto-btn" onclick="document.getElementById('foto-input').click()">
         <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5">
           <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
@@ -1288,7 +1310,7 @@ nav{
   <div class="stock-form-body">
     <!-- Foto -->
     <div class="consig-section-label">Foto referencial</div>
-    <input type="file" id="sf-foto-input" accept="image/*" capture="environment" style="display:none" onchange="onStockFoto(this)">
+    <input type="file" id="sf-foto-input" accept="image/*" style="display:none" onchange="onStockFoto(this)">
     <div class="consig-foto-btn" id="sf-foto-btn" onclick="document.getElementById('sf-foto-input').click()">
       <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5">
         <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
@@ -1356,7 +1378,7 @@ nav{
       <div class="consig-section-label" style="margin-bottom:8px">Tipo de pago</div>
       <select class="fsel" id="sv-pago" style="width:100%;margin-bottom:16px" onchange="if(stockSelectedTalla)selStockTalla({getAttribute:function(){return stockSelectedTalla}})">
         <option>Transferencia</option><option>Efectivo</option>
-        <option>Débito</option><option>Crédito</option>
+        <option>Débito</option><option>Crédito</option><option>SumUp</option><option>SumUp</option>
       </select>
       <div id="sv-calc" style="background:var(--gray1);padding:12px;margin-bottom:12px;font-size:10px"></div>
       <button class="consig-submit-btn" id="sv-submit" onclick="confirmarStockVenta()">
@@ -1390,7 +1412,7 @@ nav{
   <div class="consig-form-body">
     <!-- Foto -->
     <div class="consig-section-label">Foto de la prenda *</div>
-    <input type="file" id="consig-foto-input" accept="image/*" capture="environment" style="display:none" onchange="onConsigFoto(this)">
+    <input type="file" id="consig-foto-input" accept="image/*" style="display:none" onchange="onConsigFoto(this)">
     <div class="consig-foto-btn" id="consig-foto-btn" onclick="document.getElementById('consig-foto-input').click()">
       <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5">
         <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
@@ -1619,6 +1641,32 @@ window.onunhandledrejection = function(e) {
 
 const API = window.location.origin;
 
+
+
+// ── UPLOAD LOADING ────────────────────────────────────────────────────────────
+function showUploadLoading(title, steps){
+  document.getElementById('upload-loading-title').textContent = title || 'Subiendo...';
+  document.getElementById('upload-loading-msg').textContent = steps[0] || '';
+  document.getElementById('upload-progress-fill').style.width = '0%';
+  document.getElementById('upload-loading').classList.add('show');
+  var i = 0;
+  var total = steps.length;
+  var interval = setInterval(function(){
+    i++;
+    if(i >= total){ clearInterval(interval); return; }
+    document.getElementById('upload-loading-msg').textContent = steps[i];
+    document.getElementById('upload-progress-fill').style.width = Math.round((i/total)*90)+'%';
+  }, 1200);
+  return interval;
+}
+
+function hideUploadLoading(interval){
+  if(interval) clearInterval(interval);
+  document.getElementById('upload-progress-fill').style.width = '100%';
+  setTimeout(function(){
+    document.getElementById('upload-loading').classList.remove('show');
+  }, 400);
+}
 
 // ── IMAGE PREVIEW MODAL ────────────────────────────────────────────────────
 function openImgModal(urlOrEl) {
@@ -3130,6 +3178,10 @@ async function registrarStockMarca(){
   if(totalUnidades===0){toast('Agrega al menos 1 unidad','err');return;}
   var btn=document.getElementById('sf-submit-btn');
   btn.textContent='Registrando...'; btn.disabled=true;
+  var _loadingSteps = stockFotoFile
+    ? ['Preparando foto...','Subiendo foto a Drive...','Registrando en Google Sheets...','Casi listo...']
+    : ['Registrando en Google Sheets...','Guardando tallas...','Casi listo...'];
+  var _loadingInterval = showUploadLoading('Ingresando stock', _loadingSteps);
   try{
     var fd=new FormData();
     if(stockFotoFile) fd.append('foto',stockFotoFile);
@@ -3142,6 +3194,7 @@ async function registrarStockMarca(){
     var r=await fetch(API+'/pos/stock-marcas',{method:'POST',body:fd});
     var d=await r.json();
     if(!r.ok) throw new Error(d.detail||'Error');
+    hideUploadLoading(_loadingInterval);
     toast('Entrada registrada ✓','ok');
     cerrarFormStock();
     // Reset form
@@ -3155,6 +3208,7 @@ async function registrarStockMarca(){
     document.getElementById('sf-foto-label').textContent='Agregar foto referencial';
     await loadStockMarcas();
   }catch(e){
+    hideUploadLoading(_loadingInterval);
     toast(e.message||'Error','err');
   }
   btn.textContent='Registrar entrada →'; btn.disabled=false;
@@ -3648,6 +3702,10 @@ async function registrarConsignacion(){
 
   var btn = document.getElementById('consig-submit-btn');
   btn.textContent='Registrando...';btn.disabled=true;
+  var _cLoadingSteps = consigFotoFile
+    ? ['Preparando foto...','Subiendo foto a Drive...','Registrando en Google Sheets...','Casi listo...']
+    : ['Registrando en Google Sheets...','Guardando datos...','Casi listo...'];
+  var _cLoadingInterval = showUploadLoading('Ingresando consignacion', _cLoadingSteps);
 
   try{
     var fd = new FormData();
@@ -3676,7 +3734,8 @@ async function registrarConsignacion(){
     var d = await r.json();
     if(!r.ok) throw new Error(d.detail||'Error');
 
-    toast('Consignación registrada en Shopify y Sheets ✓','ok');
+    hideUploadLoading(_cLoadingInterval);
+    toast('Consignacion registrada en Sheets ✓','ok');
     cerrarFormConsig();
     // Limpiar form
     ['cf-nombre','cf-talla','cf-precio','cf-acordado','cf-dueno','cf-ig','cf-email','cf-tel','cf-notas','cf-marca-nueva']
@@ -3689,9 +3748,10 @@ async function registrarConsignacion(){
     // consignaciones y stock cargan lazy al abrir la pestaña
 
   }catch(e){
+    hideUploadLoading(_cLoadingInterval);
     toast(e.message||'Error al registrar','err');
   }
-  btn.textContent='Registrar consignación →';btn.disabled=false;
+  btn.textContent='Registrar consignacion →';btn.disabled=false;
 }
 
 async function loadConsignaciones(){
@@ -3858,6 +3918,17 @@ setInterval(async () => {
       <button class="confirm-ok danger" id="confirm-ok-btn" onclick="closeConfirm(true)">Eliminar</button>
     </div>
   </div>
+</div>
+
+<!-- Upload loading overlay -->
+<div class="upload-loading" id="upload-loading">
+  <svg width="32" height="32" viewBox="0 0 24 24" stroke="var(--orange)" fill="none" stroke-width="1.5" style="animation:spin 1s linear infinite">
+    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,.2)"/>
+    <path d="M12 2a10 10 0 0 1 10 10"/>
+  </svg>
+  <div class="upload-loading-title" id="upload-loading-title">Subiendo...</div>
+  <div class="upload-progress-bar"><div class="upload-progress-fill" id="upload-progress-fill"></div></div>
+  <div class="upload-loading-msg" id="upload-loading-msg">Esto puede tomar unos segundos</div>
 </div>
 </body>
 </html>
