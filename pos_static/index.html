@@ -2697,15 +2697,34 @@ function renderResumenes(d,mes){
     if(esExt) netoMarcasExt += (x.precio_bruto||0)*0.75;
   });
 
-  const cierreResultado = netoPos - totalComVend - totalGastos;
-  const cierreCls = cierreResultado >= 0 ? 'positivo' : 'negativo';
+  // Pago a marcas externas (75% del bruto)
+  const pagoMarcas = {};
+  v.forEach(x=>{
+    const esExt = x.marca && !['Tienda','Consignacion',''].includes(x.marca);
+    if(!esExt) return;
+    if(!pagoMarcas[x.marca]) pagoMarcas[x.marca] = {bruto:0, pago:0, comTienda:0};
+    pagoMarcas[x.marca].bruto      += x.precio_bruto||0;
+    pagoMarcas[x.marca].pago       += (x.precio_bruto||0)*0.75;
+    pagoMarcas[x.marca].comTienda  += (x.precio_bruto||0)*0.25;
+  });
+  const totalPagoMarcas = Object.values(pagoMarcas).reduce((s,m)=>s+m.pago,0);
+  const totalComTiendaMarcas = Object.values(pagoMarcas).reduce((s,m)=>s+m.comTienda,0);
+
+  // Pago a dueños de consignaciones vendidas
+  const pagoConsig = (consigData.vendidas||[]).filter(c=>{
+    return v.some(x=>x.shopify_id && x.shopify_id===c.shopify_gid);
+  }).reduce((s,c)=>s+c.valor_acordado,0);
+
+  const cierreResultado = netoPos - totalComVend - totalGastos - totalPagoMarcas;
+  const cierreCls = cierreResultado >= 0 ? '#2d6a4f' : '#cc3300';
 
   const cierreCard = `<div class="res-card" style="grid-column:1/-1;border:2px solid var(--black)">
     <div class="res-card-title" style="font-size:11px">Cierre real — ${mes}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0">
       <div style="padding:10px;background:var(--gray1)">
-        <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">NETO POS (ventas - IVA - com.banco)</div>
+        <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">NETO POS</div>
         <div style="font-size:16px;font-weight:700">$${fmt(Math.round(netoPos))}</div>
+        <div style="font-size:8px;color:var(--gray4);margin-top:2px">ventas - IVA - com.banco</div>
       </div>
       <div style="padding:10px;background:var(--gray1)">
         <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">COM. VENDEDORAS</div>
@@ -2716,13 +2735,29 @@ function renderResumenes(d,mes){
         <div style="font-size:16px;font-weight:700;color:#cc3300">-$${fmt(Math.round(totalGastos))}</div>
         ${totalGastos===0?'<div style="font-size:8px;color:var(--gray3);margin-top:2px">Ingresa gastos en pestaña Gastos</div>':''}
       </div>
+      ${totalPagoMarcas>0?`<div style="padding:10px;background:var(--gray1)">
+        <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">PAGO A MARCAS (75%)</div>
+        <div style="font-size:16px;font-weight:700;color:#cc3300">-$${fmt(Math.round(totalPagoMarcas))}</div>
+      </div>`:''}
     </div>
+    ${totalPagoMarcas>0?`<div style="margin-bottom:12px">
+      <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:6px;text-transform:uppercase">Desglose por marca</div>
+      ${Object.entries(pagoMarcas).sort((a,b)=>b[1].bruto-a[1].bruto).map(([nombre,md])=>`
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray2);font-size:10px">
+          <span>${esc(nombre)}</span>
+          <div style="display:flex;gap:16px">
+            <span style="color:var(--gray4)">Bruto $${fmt(Math.round(md.bruto))}</span>
+            <span style="color:#2d6a4f">Tienda $${fmt(Math.round(md.comTienda))}</span>
+            <span style="color:#cc3300;font-weight:600">Pagar $${fmt(Math.round(md.pago))}</span>
+          </div>
+        </div>`).join('')}
+    </div>`:''}
     <div style="border-top:2px solid var(--black);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
       <div>
-        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4)">Resultado final</div>
-        <div style="font-size:9px;color:var(--gray4);margin-top:2px">Neto POS - Com.Vendedoras - Gastos</div>
+        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4)">Resultado final tienda</div>
+        <div style="font-size:9px;color:var(--gray4);margin-top:2px">Neto - Com.Vendedoras - Gastos - Pago marcas</div>
       </div>
-      <div style="font-size:28px;font-weight:700;color:${cierreResultado>=0?'#2d6a4f':'#cc3300'}">
+      <div style="font-size:28px;font-weight:700;color:${cierreCls}">
         ${cierreResultado>=0?'':'- '}$${fmt(Math.round(Math.abs(cierreResultado)))}
       </div>
     </div>
