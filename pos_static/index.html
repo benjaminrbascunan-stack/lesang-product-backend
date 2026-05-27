@@ -2538,7 +2538,7 @@ function goTo(name,btn){
   page.style.height='calc(100vh - '+getComputedStyle(document.documentElement).getPropertyValue('--nav')+')';
   if(name==='hist'){buildMesTabs();renderHistorial();}
   if(name==='config') renderConfigPage();
-  if(name==='resumenes') initResumenes();
+  if(name==='resumenes'){ initResumenes(); if(!gastosTotal) loadGastos(); }
   if(name==='inventario') initInventario();
   if(name==='gastos') initGastos();
   var fab=document.getElementById('sheet-fab');
@@ -2551,12 +2551,20 @@ function goTo(name,btn){
 }
 
 // ── RESUMENES ─────────────────────────────────────────────────────────────────
+var _resumenCache = {};  // cache por mes
+
 function initResumenes(){
   const sel=document.getElementById('res-mes-sel');
   if(!sel.innerHTML){
     sel.innerHTML=MESES.map(m=>`<option${m===MES?' selected':''}>${m}</option>`).join('');
   }
-  loadResumenes();
+  const mes = document.getElementById('res-mes-sel').value||MES;
+  // Si ya tenemos datos de este mes, mostrar sin recargar
+  if(_resumenCache[mes]){
+    renderResumenes(_resumenCache[mes], mes);
+  } else {
+    loadResumenes();
+  }
 }
 
 async function loadResumenes(){
@@ -2566,6 +2574,7 @@ async function loadResumenes(){
   try{
     const r=await fetch(`${API}/pos/historial/${mes}`);
     const d=await r.json();
+    _resumenCache[mes]=d;  // guardar en cache
     renderResumenes(d,mes);
   }catch{
     grid.innerHTML=`<div class="res-card" style="grid-column:1/-1;padding:40px;text-align:center"><div class="empty-txt">Error cargando datos</div></div>`;
@@ -2664,7 +2673,62 @@ function renderResumenes(d,mes){
       </div>`).join('')}
   </div>`;
 
-  grid.innerHTML=tiendaCard+marcasCard+vendCard+topCard;
+  // ── Cierre real del mes ──────────────────────────────────────────────────
+  // Ingresos netos POS
+  const netoPos = rs.total_neto||0;
+
+  // Comisiones a marcas externas (25% del bruto de cada marca externa)
+  let comMarcasExt = 0;
+  v.forEach(x=>{
+    const esExt = x.marca && !['Tienda','Consignacion',''].includes(x.marca);
+    if(esExt) comMarcasExt += (x.precio_bruto||0)*0.25;
+  });
+
+  // Comisiones vendedoras (ya calculadas)
+  const totalComVend = rs.total_com_vendedor||0;
+
+  // Gastos del mes (del modulo gastos)
+  const totalGastos = gastosTotal||0;
+
+  // Ingreso real de marcas externas (75% del bruto)
+  let netoMarcasExt = 0;
+  v.forEach(x=>{
+    const esExt = x.marca && !['Tienda','Consignacion',''].includes(x.marca);
+    if(esExt) netoMarcasExt += (x.precio_bruto||0)*0.75;
+  });
+
+  const cierreResultado = netoPos - totalComVend - totalGastos;
+  const cierreCls = cierreResultado >= 0 ? 'positivo' : 'negativo';
+
+  const cierreCard = `<div class="res-card" style="grid-column:1/-1;border:2px solid var(--black)">
+    <div class="res-card-title" style="font-size:11px">Cierre real — ${mes}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0">
+      <div style="padding:10px;background:var(--gray1)">
+        <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">NETO POS (ventas - IVA - com.banco)</div>
+        <div style="font-size:16px;font-weight:700">$${fmt(Math.round(netoPos))}</div>
+      </div>
+      <div style="padding:10px;background:var(--gray1)">
+        <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">COM. VENDEDORAS</div>
+        <div style="font-size:16px;font-weight:700;color:#cc3300">-$${fmt(Math.round(totalComVend))}</div>
+      </div>
+      <div style="padding:10px;background:var(--gray1)">
+        <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:4px">GASTOS DEL MES</div>
+        <div style="font-size:16px;font-weight:700;color:#cc3300">-$${fmt(Math.round(totalGastos))}</div>
+        ${totalGastos===0?'<div style="font-size:8px;color:var(--gray3);margin-top:2px">Ingresa gastos en pestaña Gastos</div>':''}
+      </div>
+    </div>
+    <div style="border-top:2px solid var(--black);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4)">Resultado final</div>
+        <div style="font-size:9px;color:var(--gray4);margin-top:2px">Neto POS - Com.Vendedoras - Gastos</div>
+      </div>
+      <div style="font-size:28px;font-weight:700;color:${cierreResultado>=0?'#2d6a4f':'#cc3300'}">
+        ${cierreResultado>=0?'':'- '}$${fmt(Math.round(Math.abs(cierreResultado)))}
+      </div>
+    </div>
+  </div>`;
+
+  grid.innerHTML=tiendaCard+marcasCard+vendCard+topCard+cierreCard;
 }
 
 // ── OPERACIONES ────────────────────────────────────────────────────────────────
