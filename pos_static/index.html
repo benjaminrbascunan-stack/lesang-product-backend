@@ -2616,7 +2616,13 @@ function renderResumenes(d,mes){
     marcas[m].ventas++;
     marcas[m].bruto+=x.precio_bruto;
     const esExt=!['Tienda',''].includes(m);
-    marcas[m].comision_tienda+=esExt?x.precio_bruto*0.25:x.neto_tienda;
+    if(esExt){
+      const marcaCfg=(CFG.marcas||[]).find(mc=>mc.nombre===m);
+      const pct=marcaCfg?(marcaCfg.comision||0.25):0.25;
+      marcas[m].comision_tienda+=x.precio_bruto*pct;
+    } else {
+      marcas[m].comision_tienda+=x.neto_tienda;
+    }
   });
   const marcasCard=`<div class="res-card">
     <div class="res-card-title">Por marca</div>
