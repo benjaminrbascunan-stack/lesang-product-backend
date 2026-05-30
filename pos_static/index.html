@@ -2697,15 +2697,19 @@ function renderResumenes(d,mes){
     if(esExt) netoMarcasExt += (x.precio_bruto||0)*0.75;
   });
 
-  // Pago a marcas externas (75% del bruto)
+  // Pago a marcas externas (usando % real de cada marca desde CFG)
   const pagoMarcas = {};
   v.forEach(x=>{
     const esExt = x.marca && !['Tienda','Consignacion',''].includes(x.marca);
     if(!esExt) return;
-    if(!pagoMarcas[x.marca]) pagoMarcas[x.marca] = {bruto:0, pago:0, comTienda:0};
-    pagoMarcas[x.marca].bruto      += x.precio_bruto||0;
-    pagoMarcas[x.marca].pago       += (x.precio_bruto||0)*0.75;
-    pagoMarcas[x.marca].comTienda  += (x.precio_bruto||0)*0.25;
+    // Buscar comision real de la marca en CFG
+    const marcaCfg = (CFG.marcas||[]).find(m=>m.nombre===x.marca);
+    const pctCom = marcaCfg ? (marcaCfg.comision||0.25) : 0.25;
+    const pctPago = 1 - pctCom;
+    if(!pagoMarcas[x.marca]) pagoMarcas[x.marca] = {bruto:0, pago:0, comTienda:0, pct:pctCom};
+    pagoMarcas[x.marca].bruto     += x.precio_bruto||0;
+    pagoMarcas[x.marca].pago      += (x.precio_bruto||0)*pctPago;
+    pagoMarcas[x.marca].comTienda += (x.precio_bruto||0)*pctCom;
   });
   const totalPagoMarcas = Object.values(pagoMarcas).reduce((s,m)=>s+m.pago,0);
   const totalComTiendaMarcas = Object.values(pagoMarcas).reduce((s,m)=>s+m.comTienda,0);
@@ -2744,7 +2748,7 @@ function renderResumenes(d,mes){
       <div style="font-size:8px;letter-spacing:.15em;color:var(--gray4);margin-bottom:6px;text-transform:uppercase">Desglose por marca</div>
       ${Object.entries(pagoMarcas).sort((a,b)=>b[1].bruto-a[1].bruto).map(([nombre,md])=>`
         <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--gray2);font-size:10px">
-          <span>${esc(nombre)}</span>
+          <span>${esc(nombre)} <span style="color:var(--gray4);font-size:9px">${Math.round(md.pct*100)}% tienda</span></span>
           <div style="display:flex;gap:16px">
             <span style="color:var(--gray4)">Bruto $${fmt(Math.round(md.bruto))}</span>
             <span style="color:#2d6a4f">Tienda $${fmt(Math.round(md.comTienda))}</span>
