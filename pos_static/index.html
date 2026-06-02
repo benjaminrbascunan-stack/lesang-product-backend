@@ -1318,7 +1318,7 @@ nav{
       <button class="gtab active" id="gtab-ingresar" onclick="switchGastosTab('ingresar',this)">Ingresar Gasto</button>
       <button class="gtab" id="gtab-resumen" onclick="switchGastosTab('resumen',this)">Resumen del Mes</button>
     </div>
-    <span id="gastos-mes-label" style="font-size:9px;color:var(--gray4);letter-spacing:.1em"></span>
+    <select class="fsel" id="gastos-mes-sel" style="font-size:10px;padding:4px 8px;width:auto;border:1px solid var(--gray2)" onchange="cambiarMesGastos(this.value)"></select>
   </div>
   <div class="gastos-body" id="gastos-body"></div>
 </div>
@@ -3645,15 +3645,29 @@ var CATEGORIAS   = ['Luz','Internet','Agua','Alarma','Aseo','Arriendo',
                     'Gastos Comunes','Ropa Comprada','Gastos Tienda Internos',
                     'Honorarios Marenna','Honorarios Michelle','Otro'];
 
+var _gastosMes = null;
+
 async function initGastos(){
-  var lbl = document.getElementById('gastos-mes-label');
-  if(lbl) lbl.textContent = MES.toUpperCase();
+  _gastosMes = _gastosMes || MES;
+  // Populate month selector
+  var sel = document.getElementById('gastos-mes-sel');
+  if(sel && !sel.innerHTML){
+    sel.innerHTML = MESES.map(function(m){
+      return '<option value="'+m+'"'+(m===_gastosMes?' selected':'')+'>'+m+'</option>';
+    }).join('');
+  }
+  await loadGastos();
+}
+
+async function cambiarMesGastos(mes){
+  _gastosMes = mes;
   await loadGastos();
 }
 
 async function loadGastos(){
+  var mes = _gastosMes || MES;
   try{
-    var r = await fetch(API+'/pos/gastos/'+MES);
+    var r = await fetch(API+'/pos/gastos/'+mes);
     var d = await r.json();
     gastosData  = d.gastos||[];
     gastosTotal = d.total||0;
@@ -3710,7 +3724,7 @@ function renderGastosForm(body){
     +'</div>'
 
     // List
-    +'<div style="font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4);margin-top:8px">'+MES+' — '+gastosData.length+' gastos</div>'
+    +'<div style="font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4);margin-top:8px">'+(_gastosMes||MES)+' — '+gastosData.length+' gastos</div>'
     +(gastosData.length ? '' : '<div style="padding:20px;text-align:center;color:var(--gray4);font-size:10px">Sin gastos registrados</div>')
     +gastosData.map(function(g){
       return '<div class="gasto-row">'
