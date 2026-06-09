@@ -1076,6 +1076,53 @@ def eliminar_gasto(row_index: int):
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+@app.post("/pos/stock-marcas/guardar-original")
+async def guardar_stock_original():
+    """Copia el stock actual de cada talla a columnas O-U como stock original."""
+    try:
+        from pos_sheets import get_creds, get_or_create_sheet, get_stock_marcas
+        from googleapiclient.discovery import build as sbuild
+        
+        items = get_stock_marcas()
+        if not items:
+            return {"success": True, "count": 0, "message": "Sin items"}
+        
+        creds  = get_creds()
+        sheets = sbuild("sheets", "v4", credentials=creds)
+        sid    = get_or_create_sheet()
+        
+        # Agregar header O1:U1
+        sheets.spreadsheets().values().update(
+            spreadsheetId=sid,
+            range="📦 Stock Marcas!O1:U1",
+            valueInputOption="RAW",
+            body={"values": [["Orig_XXS","Orig_XS","Orig_S","Orig_M","Orig_L","Orig_XL","Orig_XXL"]]}
+        ).execute()
+        
+        TALLAS = ["XXS","XS","S","M","L","XL","XXL"]
+        orig_rows = []
+        for item in items:
+            row = [int(item["tallas"].get(t, 0) or 0) for t in TALLAS]
+            orig_rows.append({"row": item["row_index"], "vals": row})
+        
+        # Escribir cada fila individualmente para respetar row_index
+        data = []
+        for item in orig_rows:
+            data.append({
+                "range": f"📦 Stock Marcas!O{item['row']}:U{item['row']}",
+                "values": [item["vals"]]
+            })
+        
+        sheets.spreadsheets().values().batchUpdate(
+            spreadsheetId=sid,
+            body={"valueInputOption": "RAW", "data": data}
+        ).execute()
+        
+        return {"success": True, "count": len(orig_rows)}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 # ── Servir el POS frontend ────────────────────────────────────────────────────
 app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")
 
