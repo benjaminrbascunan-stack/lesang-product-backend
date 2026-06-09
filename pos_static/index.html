@@ -3188,8 +3188,21 @@ function renderInventario(){
           : '<div class="stock-card-img-ph"></div>';
         var tallas = TALLAS.map(function(t){
           var qty = item.tallas[t]||0;
-          return '<span class="talla-badge '+(qty>0?'disponible':'agotada')+'">'+t+(qty>0?' '+qty:'')+'</span>';
+          var orig = item.tallas_orig ? (item.tallas_orig[t]||qty) : qty;
+          var vendido = Math.max(0, orig - qty);
+          var badge = qty>0 ? 'disponible' : 'agotada';
+          var label = (orig > qty) ? t+' '+qty+'/'+orig : (qty>0 ? t+' '+qty : t);
+          return '<span class="talla-badge '+badge+'" title="Orig:'+orig+' Vendido:'+vendido+'">'+label+'</span>';
         }).join('');
+        var totalOrig = item.total_orig || item.total;
+        var totalVend = Math.max(0, totalOrig - item.total);
+        var stockBar = (totalOrig > item.total)
+          ? '<div style="display:flex;gap:8px;font-size:9px;margin-top:6px;color:var(--gray4)">'
+            +'<span>Ingresado <strong style="color:var(--text)">'+totalOrig+'</strong></span>'
+            +'<span style="color:var(--orange)">Vendido <strong>'+totalVend+'</strong></span>'
+            +'<span style="color:#2d6a4f">Disponible <strong>'+item.total+'</strong></span>'
+            +'</div>'
+          : '';
         html += '<div class="stock-card">'
           +'<div onclick="abrirStockVenta('+item.row_index+')" style="cursor:pointer">'
           +img
@@ -3197,6 +3210,7 @@ function renderInventario(){
           +'<div class="stock-card-name">'+esc(item.nombre_prenda)+'</div>'
           +'<div class="stock-card-price">$'+fmt(item.precio_venta)+'</div>'
           +'<div class="stock-tallas">'+tallas+'</div>'
+          +stockBar
           +'</div></div>'
           +'<div style="display:flex;gap:6px;padding:8px 12px 10px">'
           +'<button class="stock-edit-btn" onclick="editarStockItem('+item.row_index+')">Editar</button>'
