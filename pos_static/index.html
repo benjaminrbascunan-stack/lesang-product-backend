@@ -1294,7 +1294,7 @@ nav{
 
 <!-- NAV -->
 <nav>
-  <div class="nav-logo">
+  <div class="nav-logo" onclick="logout()" style="cursor:pointer" title="Cerrar sesión">
     <span class="nav-wordmark">LESANG</span>
     <span class="nav-gallery">GALLERY</span>
   </div>
@@ -1328,12 +1328,13 @@ nav{
       Operaciones
     </button>
   </div>
+    <button onclick="logout()" style="margin-left:auto;margin-right:12px;height:28px;flex-shrink:0;display:none" id="logout-btn"></button>
+  </div>
   <div class="nav-right">
     <div class="ndot"></div>
     <span id="clock"></span>
     <span id="mes-label" style="color:var(--orange)"></span>
     <a id="sheet-link" href="#" target="_blank" style="display:none">↗ Sheets</a>
-    <button onclick="logout()" style="background:none;border:1px solid #333;color:#555;font-family:var(--font);font-size:8px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;padding:4px 10px;transition:var(--transition)" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#555'">Salir</button>
   </div>
 </nav>
 
