@@ -286,7 +286,20 @@ def get_or_create_sheet() -> str:
     sheets = build("sheets", "v4", credentials=creds)
     drive  = build("drive",  "v3", credentials=creds)
 
-    # Verificar ID en memoria
+    # PRIMERO: usar POS_SHEET_ID del entorno si está definido
+    env_id = os.environ.get("POS_SHEET_ID", "").strip()
+    if env_id:
+        _SHEET_ID = env_id
+        try:
+            sheets.spreadsheets().get(spreadsheetId=_SHEET_ID).execute()
+            print(f"[Sheets] Usando POS_SHEET_ID: {_SHEET_ID}")
+            return _SHEET_ID
+        except Exception as e:
+            print(f"[Sheets] POS_SHEET_ID no accesible: {e}")
+            # NO borrar ni crear — lanzar error para que el problema sea visible
+            raise RuntimeError(f"Sheet {_SHEET_ID} no accesible. Verificar token y permisos.")
+
+    # Verificar ID en memoria (solo si no hay env var)
     if _SHEET_ID:
         try:
             meta = sheets.spreadsheets().get(spreadsheetId=_SHEET_ID).execute()
@@ -296,7 +309,7 @@ def get_or_create_sheet() -> str:
         except Exception:
             _SHEET_ID = ""
 
-    # Buscar en Drive por nombre
+    # Buscar en Drive por nombre — NUNCA BORRAR, solo leer
     q = "name='Lé Sang — Ventas POS' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false"
     results = drive.files().list(q=q, fields="files(id)", orderBy="createdTime desc").execute()
     files = results.get("files", [])
@@ -312,13 +325,8 @@ def get_or_create_sheet() -> str:
         except Exception:
             continue
 
-    # Borrar corruptos
-    for f in files:
-        try:
-            drive.files().delete(fileId=f["id"]).execute()
-            print(f"[Sheets] Corrupto eliminado: {f['id']}")
-        except Exception:
-            pass
+    # NUNCA BORRAR ARCHIVOS - esto causó la pérdida de datos
+    # Si no se encuentra un sheet válido, crear uno nuevo SIN borrar los existentes
 
     # Crear nuevo
     body = {
