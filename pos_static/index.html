@@ -3393,6 +3393,8 @@ async function registrarStockMarca(){
     hideUploadLoading(_loadingInterval);
     toast('Entrada registrada ✓','ok');
     cerrarFormStock();
+    // Invalidar cache
+    _stockCache = null;
     // Reset form
     ['sf-nombre','sf-precio','sf-notas','sf-marca-nueva'].forEach(function(id){
       var el=document.getElementById(id); if(el) el.value='';
@@ -3485,15 +3487,29 @@ async function eliminarStockItem(rowIndex, nombre){
   }
 }
 
-async function loadStockMarcas(){
-  try{
-    var r=await fetch(API+'/pos/stock-marcas');
-    var d=await r.json();
-    stockData=d.items||[];
-    document.getElementById('stock-badge').textContent=stockData.length;
-    document.getElementById('inv-badge').textContent=stockData.length+(consigData.activas?consigData.activas.length:0);
+var _stockCache = null;
+var _stockCacheTime = 0;
+var STOCK_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+async function loadStockMarcas(forceRefresh){
+  // Usar cache si es fresco y no se fuerza recarga
+  if(!forceRefresh && _stockCache && (Date.now() - _stockCacheTime) < STOCK_CACHE_TTL){
+    stockData = _stockCache;
+    document.getElementById('stock-badge').textContent = stockData.length;
+    document.getElementById('inv-badge').textContent = stockData.length + (consigData.activas ? consigData.activas.length : 0);
     if(document.getElementById('page-inventario').classList.contains('active')) renderInventario();
-  }catch(e){console.warn('Error cargando stock:',e);}
+    return;
+  }
+  try{
+    var r = await fetch(API+'/pos/stock-marcas');
+    var d = await r.json();
+    stockData = d.items||[];
+    _stockCache = stockData;
+    _stockCacheTime = Date.now();
+    document.getElementById('stock-badge').textContent = stockData.length;
+    document.getElementById('inv-badge').textContent = stockData.length + (consigData.activas ? consigData.activas.length : 0);
+    if(document.getElementById('page-inventario').classList.contains('active')) renderInventario();
+  }catch(e){ console.warn('Error cargando stock:',e); }
 }
 
 function switchStockTab(tab,btn){
@@ -3633,6 +3649,8 @@ async function confirmarStockVenta(){
     toast('Venta registrada ✓','ok');
     cerrarStockVenta();
     _stockVentaProcessing = false;
+    // Invalidar cache — se vendió algo
+    _stockCache = null;
     // Actualizar stock local
     if(soldItem && soldItem.tallas && soldItem.tallas[soldTalla]>0){
       soldItem.tallas[soldTalla]--;
