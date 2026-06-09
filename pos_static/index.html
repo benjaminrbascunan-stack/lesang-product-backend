@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>LESANG — POS</title>
 <link rel="manifest" href="/pos/static/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1171,6 +1171,7 @@ nav{
   color:var(--white);font-family:var(--font);font-size:18px;font-weight:300;
   cursor:pointer;transition:var(--transition);
   display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;
 }
 .pin-btn:hover{background:#111;border-color:#444}
 .pin-btn:active{background:#222}
@@ -1332,6 +1333,7 @@ nav{
     <span id="clock"></span>
     <span id="mes-label" style="color:var(--orange)"></span>
     <a id="sheet-link" href="#" target="_blank" style="display:none">↗ Sheets</a>
+    <button onclick="logout()" style="background:none;border:1px solid #333;color:#555;font-family:var(--font);font-size:8px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;padding:4px 10px;transition:var(--transition)" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#555'">Salir</button>
   </div>
 </nav>
 
@@ -1877,11 +1879,11 @@ function setLoginType(type){
   document.getElementById('login-error').textContent = '';
   document.querySelectorAll('.login-type-btn').forEach(function(b){b.classList.remove('active');});
   document.getElementById('lt-'+type).classList.add('active');
-  var marcaSel = document.getElementById('login-marca-sel');
-  marcaSel.style.display = type==='marca' ? 'block' : 'none';
-  if(type==='marca' && marcaSel.options.length <= 1){
-    // Populate from CFG
+  if(type==='marca'){
     populateLoginMarcas();
+    marcaSel.style.display = 'block';
+  } else {
+    marcaSel.style.display = 'none';
   }
 }
 
@@ -1978,35 +1980,49 @@ var _marcaVistaMes = '';
 async function loadMarcaVista(marca){
   _marcaVistaMarca = marca;
   var page = document.getElementById('page-marca');
-  page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Cargando...</div>';
+  page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Cargando '+esc(marca)+'...</div>';
 
-  // Buscar meses con ventas de esta marca
+  // Fetch todos los meses en paralelo
+  var promises = MESES.map(function(mes){
+    return fetch(API+'/pos/historial/'+mes)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var ventas = (d.ventas||[]).filter(function(v){ return v.marca===marca; });
+        return {mes: mes, ventas: ventas};
+      })
+      .catch(function(){ return {mes: mes, ventas: []}; });
+  });
+
+  var resultados = await Promise.all(promises);
   var mesesConVentas = [];
   var ventasPorMes = {};
-
-  for(var i=0; i<MESES.length; i++){
-    try{
-      var r = await fetch(API+'/pos/historial/'+MESES[i]);
-      var d = await r.json();
-      var ventas = (d.ventas||[]).filter(function(v){return v.marca===marca;});
-      if(ventas.length){
-        mesesConVentas.push(MESES[i]);
-        ventasPorMes[MESES[i]] = ventas;
-      }
-    }catch(e){}
-  }
+  resultados.forEach(function(r){
+    if(r.ventas.length){
+      mesesConVentas.push(r.mes);
+      ventasPorMes[r.mes] = r.ventas;
+    }
+  });
 
   if(!mesesConVentas.length){
     page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Sin ventas registradas para '+esc(marca)+'</div>';
     return;
   }
 
-  _marcaVistaMes = mesesConVentas[mesesConVentas.length-1]; // ultimo mes con ventas
+  _marcaVistaMes = mesesConVentas[mesesConVentas.length-1];
 
-  // Cargar stock
-  var stockR = await fetch(API+'/pos/stock-marcas');
-  var stockD = await stockR.json();
-  var stockMarca = (stockD.items||[]).filter(function(i){return i.marca===marca;});
+  // Usar cache de stock si existe, sino cargar
+  var stockMarca = [];
+  if(_stockCache){
+    stockMarca = _stockCache.filter(function(i){ return i.marca===marca; });
+  } else {
+    try{
+      var stockR = await fetch(API+'/pos/stock-marcas');
+      var stockD = await stockR.json();
+      _stockCache = stockD.items||[];
+      _stockCacheTime = Date.now();
+      stockMarca = _stockCache.filter(function(i){ return i.marca===marca; });
+    }catch(e){}
+  }
 
   renderMarcaVista(marca, mesesConVentas, ventasPorMes, stockMarca);
 }
@@ -2238,10 +2254,11 @@ async function init(){
   } else {
     // Mostrar login
     document.getElementById('login-screen').classList.remove('hidden');
+    // CFG ya cargó — poblar marcas ahora
     populateLoginMarcas();
     setLoad(100,'Listo');
     setTimeout(function(){ document.getElementById('loading').classList.add('out'); }, 500);
-    // Seguir cargando en background
+    // Cargar datos en background para cuando entre
     loadProducts();
     loadHistorial(MES);
     loadSheetUrl();
