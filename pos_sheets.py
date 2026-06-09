@@ -902,7 +902,7 @@ def get_stock_marcas() -> list:
     sid    = get_or_create_sheet()
     result = sheets.spreadsheets().values().get(
         spreadsheetId=sid,
-        range="📦 Stock Marcas!A2:N",
+        range="📦 Stock Marcas!A2:U",
         valueRenderOption="UNFORMATTED_VALUE",
     ).execute()
     rows = result.get("values",[])
@@ -916,6 +916,14 @@ def get_stock_marcas() -> list:
         tallas = {t: n(row[4+j]) for j,t in enumerate(TALLAS)}
         total = sum(tallas.values())
         if total <= 0: continue  # skip agotados
+        # Stock original columnas O-U (indices 14-20)
+        while len(row) < 21: row.append(0)
+        tallas_orig = {t: max(int(float(row[14+j] or 0)), tallas[t]) 
+                       for j,t in enumerate(TALLAS)}
+        # Si no hay original guardado, usar actual
+        has_orig = any(row[14+j] for j in range(7))
+        total_orig = sum(tallas_orig.values()) if has_orig else total
+
         items.append({
             "row_index":      i+2,
             "nombre_prenda":  str(row[0]),
@@ -924,6 +932,8 @@ def get_stock_marcas() -> list:
             "foto_link":      str(row[3]),
             "tallas":         tallas,
             "total":          total,
+            "tallas_orig":    tallas_orig if has_orig else tallas,
+            "total_orig":     total_orig,
             "fecha_ingreso":  str(row[12]),
             "notas":          str(row[13]),
         })
