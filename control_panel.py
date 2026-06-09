@@ -1125,7 +1125,8 @@ async def guardar_stock_original():
 
 
 @app.post("/pos/stock-marcas/actualizar-originales")
-async def actualizar_stock_originales(data: list):
+async def actualizar_stock_originales(request: Request):
+    data = await request.json()
     """Actualiza columnas O-U con stock original corregido."""
     try:
         from pos_sheets import get_creds, get_or_create_sheet
