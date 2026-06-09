@@ -1882,9 +1882,9 @@ function setLoginType(type){
   document.getElementById('lt-'+type).classList.add('active');
   if(type==='marca'){
     populateLoginMarcas();
-    marcaSel.style.display = 'block';
+    document.getElementById('login-marca-sel').style.display = 'block';
   } else {
-    marcaSel.style.display = 'none';
+    document.getElementById('login-marca-sel').style.display = 'none';
   }
 }
 
