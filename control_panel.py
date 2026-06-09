@@ -1123,6 +1123,33 @@ async def guardar_stock_original():
     except Exception as e:
         raise HTTPException(500, str(e))
 
+
+@app.post("/pos/stock-marcas/actualizar-originales")
+async def actualizar_stock_originales(data: list):
+    """Actualiza columnas O-U con stock original corregido."""
+    try:
+        from pos_sheets import get_creds, get_or_create_sheet
+        from googleapiclient.discovery import build as sbuild
+        creds  = get_creds()
+        sheets = sbuild("sheets", "v4", credentials=creds)
+        sid    = get_or_create_sheet()
+        batch  = []
+        for item in data:
+            row = item["row"]
+            vals = item["orig"]
+            batch.append({
+                "range": f"📦 Stock Marcas!O{row}:U{row}",
+                "values": [vals]
+            })
+        if batch:
+            sheets.spreadsheets().values().batchUpdate(
+                spreadsheetId=sid,
+                body={"valueInputOption":"RAW","data":batch}
+            ).execute()
+        return {"success": True, "count": len(batch)}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 # ── Servir el POS frontend ────────────────────────────────────────────────────
 app.mount("/pos/static", StaticFiles(directory=str(BASE_DIR / "pos_static")), name="pos_static")
 
