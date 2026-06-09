@@ -900,12 +900,39 @@ def get_stock_marcas() -> list:
     creds  = get_creds()
     sheets = build("sheets","v4",credentials=creds)
     sid    = get_or_create_sheet()
+
+    # Leer stock actual
     result = sheets.spreadsheets().values().get(
         spreadsheetId=sid,
         range="📦 Stock Marcas!A2:U",
         valueRenderOption="UNFORMATTED_VALUE",
     ).execute()
     rows = result.get("values",[])
+
+    # Leer historial de TODOS los meses para calcular vendido real
+    # Columnas ventas: A=Nombre, B=Talla, O=Marca (index 14)
+    vendido_real = {}  # {nombre_prenda: {talla: count}}
+    for mes in MESES:
+        try:
+            res = sheets.spreadsheets().values().get(
+                spreadsheetId=sid,
+                range=f"{mes}!A3:O",
+                valueRenderOption="UNFORMATTED_VALUE",
+            ).execute()
+            for vrow in res.get("values", []):
+                if not vrow or not vrow[0]: continue
+                nombre = str(vrow[0]).strip()
+                talla  = str(vrow[1]).strip().upper() if len(vrow) > 1 else ""
+                # Solo contar ventas de stock marcas (tienen marca en col O)
+                # Col O = index 14
+                if len(vrow) < 15: continue
+                if not talla or talla not in TALLAS: continue
+                if nombre not in vendido_real:
+                    vendido_real[nombre] = {}
+                vendido_real[nombre][talla] = vendido_real[nombre].get(talla, 0) + 1
+        except:
+            continue
+
     items = []
     for i, row in enumerate(rows):
         if not row or not any(row): continue
@@ -914,26 +941,33 @@ def get_stock_marcas() -> list:
             try: return int(float(v or 0))
             except: return 0
         tallas = {t: n(row[4+j]) for j,t in enumerate(TALLAS)}
-        total = sum(tallas.values())
-        if total <= 0: continue  # skip agotados
-        # Stock original columnas O-U (indices 14-20)
-        while len(row) < 21: row.append(0)
-        tallas_orig = {t: max(int(float(row[14+j] or 0)), tallas[t]) 
-                       for j,t in enumerate(TALLAS)}
-        # Si no hay original guardado, usar actual
-        has_orig = any(row[14+j] for j in range(7))
-        total_orig = sum(tallas_orig.values()) if has_orig else total
+        total  = sum(tallas.values())
+        nombre = str(row[0]).strip()
+
+        # Calcular vendido real desde historial
+        v_prod = vendido_real.get(nombre, {})
+        tallas_vendido = {t: v_prod.get(t, 0) for t in TALLAS}
+        total_vendido  = sum(tallas_vendido.values())
+
+        # Stock original = disponible actual + vendido real
+        tallas_orig = {t: tallas[t] + tallas_vendido[t] for t in TALLAS}
+        total_orig  = total + total_vendido
+
+        # Si no hay nada vendido ni stock, skip
+        if total <= 0 and total_vendido <= 0: continue
 
         items.append({
             "row_index":      i+2,
-            "nombre_prenda":  str(row[0]),
+            "nombre_prenda":  nombre,
             "marca":          str(row[1]),
             "precio_venta":   float(row[2]) if row[2] else 0,
             "foto_link":      str(row[3]),
             "tallas":         tallas,
             "total":          total,
-            "tallas_orig":    tallas_orig if has_orig else tallas,
+            "tallas_orig":    tallas_orig,
+            "tallas_vendido": tallas_vendido,
             "total_orig":     total_orig,
+            "total_vendido":  total_vendido,
             "fecha_ingreso":  str(row[12]),
             "notas":          str(row[13]),
         })

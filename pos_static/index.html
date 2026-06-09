@@ -3188,15 +3188,15 @@ function renderInventario(){
           : '<div class="stock-card-img-ph"></div>';
         var tallas = TALLAS.map(function(t){
           var qty = item.tallas[t]||0;
-          var orig = item.tallas_orig ? (item.tallas_orig[t]||qty) : qty;
-          var vendido = Math.max(0, orig - qty);
+          var vendido = item.tallas_vendido ? (item.tallas_vendido[t]||0) : 0;
+          var orig = qty + vendido;
           var badge = qty>0 ? 'disponible' : 'agotada';
-          var label = (orig > qty) ? t+' '+qty+'/'+orig : (qty>0 ? t+' '+qty : t);
-          return '<span class="talla-badge '+badge+'" title="Orig:'+orig+' Vendido:'+vendido+'">'+label+'</span>';
+          var label = vendido>0 ? t+' '+qty+'/'+orig : (qty>0 ? t+' '+qty : t);
+          return '<span class="talla-badge '+badge+'" title="Ingresado:'+orig+' Vendido:'+vendido+'">'+label+'</span>';
         }).join('');
-        var totalOrig = item.total_orig || item.total;
-        var totalVend = Math.max(0, totalOrig - item.total);
-        var stockBar = (totalOrig > item.total)
+        var totalVend = item.total_vendido||0;
+        var totalOrig = item.total_orig||(item.total+totalVend);
+        var stockBar = totalVend>0
           ? '<div style="display:flex;gap:8px;font-size:9px;margin-top:6px;color:var(--gray4)">'
             +'<span>Ingresado <strong style="color:var(--text)">'+totalOrig+'</strong></span>'
             +'<span style="color:var(--orange)">Vendido <strong>'+totalVend+'</strong></span>'
