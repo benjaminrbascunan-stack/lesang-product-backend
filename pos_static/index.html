@@ -1109,10 +1109,178 @@ nav{
   display:none;
 }
 .marca-group-content.open{display:grid}
+
+/* ── LOGIN SCREEN ── */
+#login-screen{
+  position:fixed;inset:0;background:var(--black);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:5000;gap:0;
+}
+#login-screen.hidden{display:none}
+.login-logo{
+  display:flex;align-items:baseline;gap:6px;margin-bottom:48px;
+}
+.login-wordmark{font-size:28px;font-weight:300;letter-spacing:.35em;color:var(--white);text-transform:uppercase}
+.login-gallery{font-size:10px;font-weight:400;letter-spacing:.25em;color:#555;text-transform:uppercase}
+.login-selector{
+  display:flex;flex-direction:column;align-items:center;gap:12px;width:280px;
+}
+.login-title{
+  font-size:9px;letter-spacing:.25em;text-transform:uppercase;
+  color:#555;margin-bottom:4px;
+}
+.login-type-btns{display:flex;gap:8px;width:100%;margin-bottom:8px}
+.login-type-btn{
+  flex:1;padding:10px;background:transparent;
+  border:1px solid #333;color:#555;
+  font-family:var(--font);font-size:10px;letter-spacing:.15em;
+  text-transform:uppercase;cursor:pointer;transition:var(--transition);
+}
+.login-type-btn:hover,.login-type-btn.active{
+  border-color:var(--white);color:var(--white);
+}
+.login-marca-sel{
+  width:100%;background:transparent;border:1px solid #333;
+  color:var(--white);font-family:var(--font);font-size:11px;
+  padding:10px 12px;outline:none;cursor:pointer;
+  appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+  padding-right:28px;
+}
+.login-marca-sel option{background:#111;color:var(--white)}
+.login-pin-label{
+  font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:#555;
+  align-self:flex-start;margin-top:4px;
+}
+.login-pin-dots{
+  display:flex;gap:12px;justify-content:center;margin:8px 0;
+}
+.pin-dot{
+  width:12px;height:12px;border-radius:50%;
+  border:1px solid #444;background:transparent;
+  transition:background .15s;
+}
+.pin-dot.filled{background:var(--white);border-color:var(--white)}
+.login-numpad{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  width:100%;margin-top:4px;
+}
+.pin-btn{
+  aspect-ratio:1;background:transparent;border:1px solid #222;
+  color:var(--white);font-family:var(--font);font-size:18px;font-weight:300;
+  cursor:pointer;transition:var(--transition);
+  display:flex;align-items:center;justify-content:center;
+}
+.pin-btn:hover{background:#111;border-color:#444}
+.pin-btn:active{background:#222}
+.pin-btn.wide{grid-column:span 2;aspect-ratio:auto;padding:14px}
+.login-error{
+  font-size:9px;letter-spacing:.1em;color:#cc3300;
+  min-height:16px;text-align:center;
+}
+.login-version{
+  position:absolute;bottom:20px;
+  font-size:8px;color:#333;letter-spacing:.1em;
+}
+
+/* ── VISTA MARCA ── */
+#page-marca{
+  position:fixed;inset:0;top:var(--nav);
+  background:var(--gray1);overflow-y:auto;
+  display:none;z-index:100;
+}
+#page-marca.active{display:block}
+.marca-vista-header{
+  background:var(--white);border-bottom:1px solid var(--gray2);
+  padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+}
+.marca-vista-title{font-size:14px;font-weight:600;letter-spacing:.05em}
+.marca-vista-sub{font-size:9px;color:var(--gray4);letter-spacing:.1em;margin-top:2px}
+.marca-mes-tabs{
+  display:flex;overflow-x:auto;border-bottom:1px solid var(--gray2);
+  background:var(--white);scrollbar-width:none;flex-shrink:0;
+}
+.marca-mes-tabs::-webkit-scrollbar{display:none}
+.marca-mes-btn{
+  padding:10px 16px;background:transparent;border:none;
+  border-bottom:2px solid transparent;
+  font-family:var(--font);font-size:9px;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--gray4);cursor:pointer;
+  white-space:nowrap;transition:var(--transition);
+}
+.marca-mes-btn.active{color:var(--orange);border-bottom-color:var(--orange)}
+.marca-resumen-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:1px;background:var(--gray2);padding:1px;margin:16px;
+}
+.marca-stat-card{
+  background:var(--white);padding:16px;
+}
+.marca-stat-label{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4);margin-bottom:6px}
+.marca-stat-val{font-size:22px;font-weight:700}
+.marca-stat-val.orange{color:var(--orange)}
+.marca-stat-val.green{color:#2d6a4f}
+.marca-stat-val.red{color:#cc3300}
+.marca-productos-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:12px;padding:0 16px 16px;
+}
+.marca-prod-card{
+  background:var(--white);border:1px solid var(--gray2);overflow:hidden;
+}
+.marca-prod-img{width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--gray1)}
+.marca-prod-body{padding:10px 12px}
+.marca-prod-name{font-size:11px;font-weight:600;margin-bottom:4px}
+.marca-prod-price{font-size:12px;color:var(--orange);font-weight:600;margin-bottom:6px}
+.marca-prod-stock{font-size:9px;color:var(--gray4);margin-top:4px}
 </style>
 </head>
 <body>
 
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-logo">
+    <span class="login-wordmark">LESANG</span>
+    <span class="login-gallery">GALLERY</span>
+  </div>
+  <div class="login-selector">
+    <div class="login-title">Selecciona tu perfil</div>
+    <div class="login-type-btns">
+      <button class="login-type-btn active" id="lt-trabajador" onclick="setLoginType('trabajador')">Trabajador</button>
+      <button class="login-type-btn" id="lt-marca" onclick="setLoginType('marca')">Marca</button>
+    </div>
+    <select class="login-marca-sel" id="login-marca-sel" style="display:none" onchange="onLoginMarcaChange()">
+      <option value="">Selecciona tu marca...</option>
+    </select>
+    <div class="login-pin-label">PIN</div>
+    <div class="login-pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="login-numpad">
+      <button class="pin-btn" onclick="pinPress(1)">1</button>
+      <button class="pin-btn" onclick="pinPress(2)">2</button>
+      <button class="pin-btn" onclick="pinPress(3)">3</button>
+      <button class="pin-btn" onclick="pinPress(4)">4</button>
+      <button class="pin-btn" onclick="pinPress(5)">5</button>
+      <button class="pin-btn" onclick="pinPress(6)">6</button>
+      <button class="pin-btn" onclick="pinPress(7)">7</button>
+      <button class="pin-btn" onclick="pinPress(8)">8</button>
+      <button class="pin-btn" onclick="pinPress(9)">9</button>
+      <button class="pin-btn" onclick="pinPress(0)" style="grid-column:2">0</button>
+      <button class="pin-btn" onclick="pinBackspace()">⌫</button>
+    </div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+  <div class="login-version">Lé Sang POS</div>
+</div>
+
+<!-- VISTA MARCA -->
+<div id="page-marca"></div>
 <!-- LOADING -->
 <div id="loading">
   <div class="load-logo">
@@ -1667,6 +1835,276 @@ const API = window.location.origin;
 
 
 
+
+// ── LOGIN / PIN SYSTEM ────────────────────────────────────────────────────────
+var _pinBuffer = '';
+var _loginType = 'trabajador';  // 'trabajador' | 'marca'
+var _loginMarca = '';
+var SESSION_KEY = 'lesang_session';
+var SESSION_TTL = 24 * 60 * 60 * 1000; // 24h
+
+function checkSession(){
+  try{
+    var s = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+    if(s.ts && (Date.now()-s.ts) < SESSION_TTL){
+      // Sesion valida
+      if(s.type === 'marca'){
+        enterMarcaVista(s.marca);
+      } else {
+        enterPOS();
+      }
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+function saveSession(type, marca){
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    type: type, marca: marca||'', ts: Date.now()
+  }));
+}
+
+function logout(){
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function setLoginType(type){
+  _loginType = type;
+  _pinBuffer = '';
+  updatePinDots();
+  document.getElementById('login-error').textContent = '';
+  document.querySelectorAll('.login-type-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('lt-'+type).classList.add('active');
+  var marcaSel = document.getElementById('login-marca-sel');
+  marcaSel.style.display = type==='marca' ? 'block' : 'none';
+  if(type==='marca' && marcaSel.options.length <= 1){
+    // Populate from CFG
+    populateLoginMarcas();
+  }
+}
+
+function populateLoginMarcas(){
+  var sel = document.getElementById('login-marca-sel');
+  sel.innerHTML = '<option value="">Selecciona tu marca...</option>';
+  (CFG.marcas||[]).forEach(function(m){
+    if(m.nombre === 'Tienda' || m.nombre === 'Consignacion') return;
+    var opt = document.createElement('option');
+    opt.value = m.nombre; opt.textContent = m.nombre;
+    sel.appendChild(opt);
+  });
+}
+
+function onLoginMarcaChange(){
+  _loginMarca = document.getElementById('login-marca-sel').value;
+  _pinBuffer = '';
+  updatePinDots();
+  document.getElementById('login-error').textContent = '';
+}
+
+function pinPress(n){
+  if(_pinBuffer.length >= 4) return;
+  _pinBuffer += String(n);
+  updatePinDots();
+  if(_pinBuffer.length === 4){
+    setTimeout(validatePin, 150);
+  }
+}
+
+function pinBackspace(){
+  _pinBuffer = _pinBuffer.slice(0,-1);
+  updatePinDots();
+  document.getElementById('login-error').textContent = '';
+}
+
+function updatePinDots(){
+  for(var i=0;i<4;i++){
+    var dot = document.getElementById('pd'+i);
+    if(dot) dot.classList.toggle('filled', i < _pinBuffer.length);
+  }
+}
+
+function validatePin(){
+  var pins = CFG.pins || {};
+  var errEl = document.getElementById('login-error');
+
+  if(_loginType === 'trabajador'){
+    var correctPin = pins.trabajador || '1234';
+    if(_pinBuffer === correctPin){
+      saveSession('trabajador', '');
+      enterPOS();
+    } else {
+      errEl.textContent = 'PIN incorrecto';
+      _pinBuffer = '';
+      updatePinDots();
+    }
+  } else {
+    if(!_loginMarca){
+      errEl.textContent = 'Selecciona una marca';
+      _pinBuffer = '';
+      updatePinDots();
+      return;
+    }
+    var marcaPins = pins.marcas || {};
+    var correctPin = marcaPins[_loginMarca] || '0000';
+    if(_pinBuffer === correctPin){
+      saveSession('marca', _loginMarca);
+      enterMarcaVista(_loginMarca);
+    } else {
+      errEl.textContent = 'PIN incorrecto';
+      _pinBuffer = '';
+      updatePinDots();
+    }
+  }
+}
+
+function enterPOS(){
+  document.getElementById('login-screen').classList.add('hidden');
+}
+
+function enterMarcaVista(marca){
+  document.getElementById('login-screen').classList.add('hidden');
+  // Ocultar nav del POS
+  document.querySelector('nav').style.display = 'none';
+  document.getElementById('page-marca').classList.add('active');
+  loadMarcaVista(marca);
+}
+
+// ── VISTA MARCA ───────────────────────────────────────────────────────────────
+var _marcaVistaMarca = '';
+var _marcaVistaMes = '';
+
+async function loadMarcaVista(marca){
+  _marcaVistaMarca = marca;
+  var page = document.getElementById('page-marca');
+  page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Cargando...</div>';
+
+  // Buscar meses con ventas de esta marca
+  var mesesConVentas = [];
+  var ventasPorMes = {};
+
+  for(var i=0; i<MESES.length; i++){
+    try{
+      var r = await fetch(API+'/pos/historial/'+MESES[i]);
+      var d = await r.json();
+      var ventas = (d.ventas||[]).filter(function(v){return v.marca===marca;});
+      if(ventas.length){
+        mesesConVentas.push(MESES[i]);
+        ventasPorMes[MESES[i]] = ventas;
+      }
+    }catch(e){}
+  }
+
+  if(!mesesConVentas.length){
+    page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Sin ventas registradas para '+esc(marca)+'</div>';
+    return;
+  }
+
+  _marcaVistaMes = mesesConVentas[mesesConVentas.length-1]; // ultimo mes con ventas
+
+  // Cargar stock
+  var stockR = await fetch(API+'/pos/stock-marcas');
+  var stockD = await stockR.json();
+  var stockMarca = (stockD.items||[]).filter(function(i){return i.marca===marca;});
+
+  renderMarcaVista(marca, mesesConVentas, ventasPorMes, stockMarca);
+}
+
+function renderMarcaVista(marca, meses, ventasPorMes, stockMarca){
+  var page = document.getElementById('page-marca');
+  var ventas = ventasPorMes[_marcaVistaMes]||[];
+
+  // Calcular stats del mes
+  var totalBruto = ventas.reduce(function(s,v){return s+v.precio_bruto;},0);
+  var marcaCfg = (CFG.marcas||[]).find(function(m){return m.nombre===marca;});
+  var pctCom = marcaCfg ? (marcaCfg.comision||0.25) : 0.25;
+  var comTienda = totalBruto * pctCom;
+  var pagarMarca = totalBruto * (1-pctCom);
+
+  // Tabs de meses
+  var mesTabs = meses.map(function(m){
+    var cls=m===_marcaVistaMes?' active':''; return '<button class="marca-mes-btn'+cls+'" data-mes="'+m+'" onclick="cambiarMarcaVistaMes(this.dataset.mes)">'+m+'</button>';
+  }).join('');
+
+  // Productos con stock
+  var productosHtml = stockMarca.length ? stockMarca.map(function(item){
+    var img = item.foto_link
+      ? '<img class="marca-prod-img" src="'+(driveThumb(item.foto_link)||item.foto_link)+'" loading="lazy">'
+      : '<div class="marca-prod-img" style="display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" stroke="var(--gray3)" fill="none" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div>';
+    var totalVend = item.total_vendido||0;
+    var totalOrig = item.total_orig||(item.total+totalVend);
+    var tallas = TALLAS.map(function(t){
+      var qty = item.tallas[t]||0;
+      var vend = item.tallas_vendido ? (item.tallas_vendido[t]||0) : 0;
+      if(qty===0 && vend===0) return '';
+      var badge = qty>0?'disponible':'agotada';
+      var label = vend>0 ? t+' '+qty+'/'+(qty+vend) : t+' '+qty;
+      return '<span class="talla-badge '+badge+'" style="font-size:8px">'+label+'</span>';
+    }).filter(Boolean).join('');
+    return '<div class="marca-prod-card">'
+      +img
+      +'<div class="marca-prod-body">'
+      +'<div class="marca-prod-name">'+esc(item.nombre_prenda)+'</div>'
+      +'<div class="marca-prod-price">$'+fmt(item.precio_venta)+'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">'+tallas+'</div>'
+      +(totalVend>0?'<div class="marca-prod-stock">Ingresado '+totalOrig+' · Vendido <span style="color:var(--orange)">'+totalVend+'</span> · Disponible <span style="color:#2d6a4f">'+item.total+'</span></div>':'')
+      +'</div></div>';
+  }).join('') : '<div style="color:var(--gray4);font-size:10px;padding:20px 0">Sin stock activo</div>';
+
+  // Detalle ventas del mes
+  var ventasHtml = ventas.length ? ventas.map(function(v){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray2);font-size:10px">'
+      +'<div>'
+      +'<div style="font-weight:600">'+esc(v.nombre_prenda)+(v.talla?' <span style="color:var(--gray4);font-weight:400">'+v.talla+'</span>':'')+'</div>'
+      +'<div style="font-size:9px;color:var(--gray4)">'+esc(v.fecha||'')+(v.hora?' '+esc(v.hora):'')+'</div>'
+      +'</div>'
+      +'<div style="text-align:right">'
+      +'<div style="font-weight:700">$'+fmt(v.precio_bruto)+'</div>'
+      +'<div style="font-size:9px;color:var(--gray4)">'+esc(v.tipo_pago)+'</div>'
+      +'</div>'
+      +'</div>';
+  }).join('') : '<div style="color:var(--gray4);font-size:10px;padding:20px 0;text-align:center">Sin ventas en '+_marcaVistaMes+'</div>';
+
+  page.innerHTML =
+    // Header
+    '<div style="background:var(--white);border-bottom:1px solid var(--gray2);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10">'
+    +'<div>'
+    +'<div style="font-size:14px;font-weight:600;letter-spacing:.05em">'+esc(marca)+'</div>'
+    +'<div style="font-size:9px;color:var(--gray4);letter-spacing:.1em;margin-top:1px">PORTAL DE MARCA — LÉ SANG GALLERY</div>'
+    +'</div>'
+    +'<button onclick="logout()" style="padding:6px 12px;background:none;border:1px solid var(--gray2);color:var(--gray4);font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer">Cerrar sesión</button>'
+    +'</div>'
+
+    // Tabs meses
+    +'<div class="marca-mes-tabs">'+mesTabs+'</div>'
+
+    // Stats
+    +'<div class="marca-resumen-grid">'
+    +'<div class="marca-stat-card"><div class="marca-stat-label">Ventas '+_marcaVistaMes+'</div><div class="marca-stat-val">'+ventas.length+'</div></div>'
+    +'<div class="marca-stat-card"><div class="marca-stat-label">Bruto vendido</div><div class="marca-stat-val orange">$'+fmt(Math.round(totalBruto))+'</div></div>'
+    +'<div class="marca-stat-card"><div class="marca-stat-label">Comisión tienda ('+Math.round(pctCom*100)+'%)</div><div class="marca-stat-val red">-$'+fmt(Math.round(comTienda))+'</div></div>'
+    +'<div class="marca-stat-card"><div class="marca-stat-label">A pagar '+esc(marca)+'</div><div class="marca-stat-val green">$'+fmt(Math.round(pagarMarca))+'</div></div>'
+    +'</div>'
+
+    // Stock actual
+    +'<div style="padding:0 16px 8px;font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4)">Stock actual</div>'
+    +'<div class="marca-productos-grid">'+productosHtml+'</div>'
+
+    // Detalle ventas
+    +'<div style="margin:0 16px 16px;background:var(--white);border:1px solid var(--gray2);padding:16px">'
+    +'<div style="font-size:9px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--gray4);margin-bottom:8px">Detalle ventas '+_marcaVistaMes+'</div>'
+    +ventasHtml
+    +'</div>';
+}
+
+function cambiarMarcaVistaMes(mes){
+  _marcaVistaMes = mes;
+  // Re-render con nuevo mes — necesitamos los datos en cache
+  // Recargamos la vista completa
+  loadMarcaVista(_marcaVistaMarca);
+}
+
 // ── UPLOAD LOADING ────────────────────────────────────────────────────────────
 function showUploadLoading(title, steps){
   document.getElementById('upload-loading-title').textContent = title || 'Subiendo...';
@@ -1794,13 +2232,27 @@ function setLoad(p,t){
 async function init(){
   setLoad(10,'Cargando configuración...');
   await loadConfig();
+  // Verificar sesion antes de continuar
+  if(checkSession()) {
+    setLoad(35,'Conectando con Shopify...');
+  } else {
+    // Mostrar login — cargar en background
+    document.getElementById('login-screen').classList.remove('hidden');
+    populateLoginMarcas();
+    setLoad(100,'Listo');
+    setTimeout(function(){ document.getElementById('loading').classList.add('out'); }, 500);
+    // Seguir cargando en background
+    loadProducts();
+    loadHistorial(MES);
+    loadSheetUrl();
+    return;
+  }
   setLoad(35,'Conectando con Shopify...');
   await loadProducts();
   setLoad(70,'Cargando historial...');
   await loadHistorial(MES);
   setLoad(90,'Conectando Google Sheets...');
   await loadSheetUrl();
-  // consignaciones y stock cargan lazy al abrir la pestaña
   setLoad(100,'Listo');
   setTimeout(function(){
     document.getElementById('loading').classList.add('out');
@@ -2455,6 +2907,25 @@ function renderConfigPage(){
           <button class="add-btn" onclick="saveComExt()">Guardar</button>
         </div>
       </div>
+    </div>
+    <div class="config-card">
+      <div class="cc-header"><div><div class="cc-title">PINs de acceso</div><div class="cc-sub">4 dígitos</div></div></div>
+      <div class="cc-body">
+        <div class="marca-row">
+          <div><div class="marca-name">Trabajador</div><div class="marca-detail">PIN para el equipo</div></div>
+          <input class="pct-input" style="width:80px;letter-spacing:.2em" type="password" maxlength="4" id="pin-trabajador"
+            value="${(CFG.pins||{}).trabajador||'1234'}"
+            onchange="savePin('trabajador',this.value)">
+        </div>
+        ${(CFG.marcas||[]).filter(m=>m.nombre!=='Tienda'&&m.nombre!=='Consignacion').map(m=>`
+        <div class="marca-row">
+          <div><div class="marca-name">${esc(m.nombre)}</div><div class="marca-detail">PIN portal marca</div></div>
+          <input class="pct-input" style="width:80px;letter-spacing:.2em" type="password" maxlength="4"
+            value="${((CFG.pins||{}).marcas||{})[m.nombre]||'0000'}"
+            onchange="savePin('marca',this.value,'${m.nombre}')">
+        </div>`).join('')}
+        <div class="config-note">Los PINs se usan en la pantalla de inicio. Mínimo 4 dígitos.</div>
+      </div>
     </div>`;
 }
 
@@ -2479,6 +2950,18 @@ function addMarca(){const n=document.getElementById('new-marca-n').value.trim();
 function removeMarca(i){const m=[...CFG.marcas];m.splice(i,1);patchConfig({marcas:m});}
 function updateMarcaPct(i,val){const m=[...CFG.marcas];m[i].comision=parseFloat(val)/100||0;patchConfig({marcas:m});}
 function saveComExt(){const p=parseFloat(document.getElementById('com-ext-pct').value)/100||0.05;patchConfig({com_externo_pct:p});toast('Comisión actualizada: '+(p*100).toFixed(0)+'%','ok');}
+
+function savePin(type, val, marca){
+  if(val.length !== 4 || !/^\d{4}$/.test(val)){ toast('El PIN debe ser de 4 dígitos','err'); return; }
+  var pins = JSON.parse(JSON.stringify(CFG.pins||{trabajador:'1234',marcas:{}}));
+  if(type==='trabajador'){
+    pins.trabajador = val;
+  } else {
+    if(!pins.marcas) pins.marcas={};
+    pins.marcas[marca] = val;
+  }
+  patchConfig({pins: pins});
+}
 
 // ── Export
 function exportCSV(){
