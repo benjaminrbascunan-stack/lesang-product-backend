@@ -1240,7 +1240,7 @@ nav{
 
 
 <!-- LOGIN SCREEN -->
-<div id="login-screen">
+<div id="login-screen" class="hidden">
   <div class="login-logo">
     <span class="login-wordmark">LESANG</span>
     <span class="login-gallery">GALLERY</span>
@@ -2236,7 +2236,7 @@ async function init(){
   if(checkSession()) {
     setLoad(35,'Conectando con Shopify...');
   } else {
-    // Mostrar login — cargar en background
+    // Mostrar login
     document.getElementById('login-screen').classList.remove('hidden');
     populateLoginMarcas();
     setLoad(100,'Listo');
