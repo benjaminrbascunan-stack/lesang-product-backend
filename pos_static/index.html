@@ -37,7 +37,7 @@ html,body{height:100%;background:var(--white);color:var(--text);font-family:var(
 #loading{
   position:fixed;inset:0;background:var(--black);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:999;transition:opacity .5s ease;
+  z-index:999;transition:opacity .8s ease;
 }
 #loading.out{opacity:0;pointer-events:none}
 .load-logo{
@@ -2341,7 +2341,10 @@ async function init(){
     // CFG ya cargó — poblar marcas ahora
     populateLoginMarcas();
     setLoad(100,'Listo');
-    setTimeout(function(){ document.getElementById('loading').classList.add('out'); }, 500);
+    // Esperar mínimo 3 segundos antes de mostrar login
+    setTimeout(function(){
+      document.getElementById('loading').classList.add('out');
+    }, 3000);
     // Cargar datos en background para cuando entre
     loadProducts();
     loadHistorial(MES);
