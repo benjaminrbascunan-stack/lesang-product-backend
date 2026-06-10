@@ -2330,8 +2330,18 @@ function setLoad(p,t){
 }
 
 async function init(){
+  var loadStart = Date.now();
   setLoad(10,'Cargando configuración...');
   await loadConfig();
+
+  var elapsed = Date.now() - loadStart;
+  var minWait = 3000;
+  if(elapsed < minWait){
+    setLoad(80,'Lé Sang Gallery...');
+    await new Promise(function(r){ setTimeout(r, minWait - elapsed); });
+  }
+  setLoad(100,'Listo');
+
   // Verificar sesion antes de continuar
   if(checkSession()) {
     setLoad(35,'Conectando con Shopify...');
