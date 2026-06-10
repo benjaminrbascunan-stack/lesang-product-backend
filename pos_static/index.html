@@ -2330,35 +2330,25 @@ function setLoad(p,t){
 }
 
 async function init(){
-  var loadStart = Date.now();
   setLoad(10,'Cargando configuración...');
   await loadConfig();
-
-  var elapsed = Date.now() - loadStart;
-  var minWait = 3000;
-  if(elapsed < minWait){
-    setLoad(80,'Lé Sang Gallery...');
-    await new Promise(function(r){ setTimeout(r, minWait - elapsed); });
-  }
-  setLoad(100,'Listo');
-
   // Verificar sesion antes de continuar
   if(checkSession()) {
     setLoad(35,'Conectando con Shopify...');
   } else {
-    // Mostrar login
-    document.getElementById('login-screen').classList.remove('hidden');
-    // CFG ya cargó — poblar marcas ahora
-    populateLoginMarcas();
+    // Sin sesion — mostrar pasos reales de carga antes del login
+    setLoad(35,'Conectando con Shopify...');
+    loadProducts(); // en background, no await
+    setLoad(60,'Cargando historial...');
+    await loadHistorial(MES);
+    setLoad(85,'Conectando Google Sheets...');
+    await loadSheetUrl();
     setLoad(100,'Listo');
-    // Esperar mínimo 3 segundos antes de mostrar login
     setTimeout(function(){
       document.getElementById('loading').classList.add('out');
-    }, 3000);
-    // Cargar datos en background para cuando entre
-    loadProducts();
-    loadHistorial(MES);
-    loadSheetUrl();
+      document.getElementById('login-screen').classList.remove('hidden');
+      populateLoginMarcas();
+    }, 600);
     return;
   }
   setLoad(35,'Conectando con Shopify...');
