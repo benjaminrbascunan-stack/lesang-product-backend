@@ -1287,7 +1287,7 @@ nav{
       <button class="pin-btn" onclick="pinPress(8)">8</button>
       <button class="pin-btn" onclick="pinPress(9)">9</button>
       <button class="pin-btn" onclick="pinPress(0)" style="grid-column:2">0</button>
-      <button class="pin-btn" onclick="pinBackspace()" style="font-size:22px">⌫</button>
+      <button class="pin-btn" onclick="pinBackspace()" style="border:none;font-size:20px;opacity:.6">⌫</button>
     </div>
     <div class="login-error" id="login-error"></div>
     <button onclick="loginBack()" style="margin-top:8px;background:none;border:none;color:#555;font-family:var(--font);font-size:9px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer">← Volver</button>
@@ -3781,10 +3781,10 @@ function renderInventario(){
         var totalVend = item.total_vendido||0;
         var totalOrig = item.total_orig||(item.total+totalVend);
         var stockBar = totalVend>0
-          ? '<div style="display:flex;gap:8px;font-size:9px;margin-top:6px;color:var(--gray4)">'
-            +'<span>Ingresado <strong style="color:var(--text)">'+totalOrig+'</strong></span>'
-            +'<span style="color:var(--orange)">Vendido <strong>'+totalVend+'</strong></span>'
-            +'<span style="color:#2d6a4f">Disponible <strong>'+item.total+'</strong></span>'
+          ? '<div style="display:flex;gap:6px;font-size:9px;margin-top:6px">'
+            +'<span style="color:var(--gray4)">Ingresado <strong style="color:var(--text)">'+totalOrig+'</strong></span>'
+            +'<span style="background:var(--orange);color:#fff;padding:1px 6px;font-weight:600">Vendido '+totalVend+'</span>'
+            +'<span style="background:#2d6a4f;color:#fff;padding:1px 6px;font-weight:600">Disponible '+item.total+'</span>'
             +'</div>'
           : '';
         html += '<div class="stock-card">'
