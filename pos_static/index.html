@@ -2170,7 +2170,11 @@ function renderMarcaVista(marca, meses, ventasPorMes, stockMarca){
       +'<div class="marca-prod-name">'+esc(item.nombre_prenda)+'</div>'
       +'<div class="marca-prod-price">$'+fmt(item.precio_venta)+'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">'+tallas+'</div>'
-      +(totalVend>0?'<div class="marca-prod-stock">Ingresado '+totalOrig+' · <span style="color:var(--orange);font-weight:600">Vendido '+totalVend+'</span> · <span style="color:#2d6a4f;font-weight:600">Disponible '+item.total+'</span></div>':'')
+      +'<div class="marca-prod-stock">'
+        +'<div>Ingresado '+totalOrig+'</div>'
+        +(totalVend>0?'<div style="color:var(--orange);font-weight:600">Vendido '+totalVend+'</div>':'')
+        +'<div style="color:#2d6a4f;font-weight:600">Disponible '+item.total+'</div>'
+      +'</div>'
       +'</div></div>';
   }).join('') : '<div style="color:var(--gray4);font-size:10px;padding:20px 0">Sin stock activo</div>';
 
