@@ -1246,16 +1246,30 @@ nav{
     <span class="login-wordmark">LESANG</span>
     <span class="login-gallery">GALLERY</span>
   </div>
-  <div class="login-selector">
-    <div class="login-title">Selecciona tu perfil</div>
-    <div class="login-type-btns">
-      <button class="login-type-btn active" id="lt-trabajador" onclick="setLoginType('trabajador')">Trabajador</button>
-      <button class="login-type-btn" id="lt-marca" onclick="setLoginType('marca')">Marca</button>
+
+  <!-- STEP 1: Selector tipo -->
+  <div id="login-step-tipo" class="login-selector">
+    <div class="login-title">¿Cómo ingresas?</div>
+    <div class="login-type-btns" style="flex-direction:column;gap:10px">
+      <button class="login-type-btn" onclick="loginStep2('trabajador')" style="padding:16px;font-size:11px">
+        Trabajador
+      </button>
+      <button class="login-type-btn" onclick="loginStep2('marca')" style="padding:16px;font-size:11px">
+        Marca
+      </button>
     </div>
-    <select class="login-marca-sel" id="login-marca-sel" style="display:none" onchange="onLoginMarcaChange()">
-      <option value="">Selecciona tu marca...</option>
-    </select>
-    <div class="login-pin-label">PIN</div>
+  </div>
+
+  <!-- STEP 2: Selector marca (solo si eligió marca) -->
+  <div id="login-step-marcas" class="login-selector" style="display:none">
+    <div class="login-title">Selecciona tu marca</div>
+    <div id="login-marcas-list" style="width:100%;display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
+    <button onclick="loginBack()" style="margin-top:12px;background:none;border:none;color:#555;font-family:var(--font);font-size:9px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer">← Volver</button>
+  </div>
+
+  <!-- STEP 3: PIN -->
+  <div id="login-step-pin" class="login-selector" style="display:none">
+    <div class="login-title" id="login-pin-quien"></div>
     <div class="login-pin-dots" id="pin-dots">
       <div class="pin-dot" id="pd0"></div>
       <div class="pin-dot" id="pd1"></div>
@@ -1276,7 +1290,9 @@ nav{
       <button class="pin-btn" onclick="pinBackspace()">⌫</button>
     </div>
     <div class="login-error" id="login-error"></div>
+    <button onclick="loginBack()" style="margin-top:8px;background:none;border:none;color:#555;font-family:var(--font);font-size:9px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer">← Volver</button>
   </div>
+
   <div class="login-version">Lé Sang POS</div>
 </div>
 
@@ -1873,38 +1889,73 @@ function logout(){
   location.reload();
 }
 
-function setLoginType(type){
-  _loginType = type;
+function loginStep2(tipo){
+  _loginType = tipo;
+  _pinBuffer = '';
+  updatePinDots();
+  document.getElementById('login-step-tipo').style.display = 'none';
+  if(tipo === 'trabajador'){
+    document.getElementById('login-pin-quien').textContent = 'PIN Trabajador';
+    document.getElementById('login-step-pin').style.display = 'flex';
+  } else {
+    // Poblar lista de marcas desde inventario + CFG
+    var list = document.getElementById('login-marcas-list');
+    list.innerHTML = '';
+    // Obtener marcas únicas del inventario
+    var marcasInv = [];
+    (stockData||[]).forEach(function(item){
+      if(item.marca && item.marca !== 'Tienda' && item.marca !== 'Consignacion' && marcasInv.indexOf(item.marca) === -1){
+        marcasInv.push(item.marca);
+      }
+    });
+    // También agregar las del CFG que no están en inventario
+    (CFG.marcas||[]).forEach(function(m){
+      if(m.nombre === 'Tienda' || m.nombre === 'Consignacion') return;
+      if(marcasInv.indexOf(m.nombre) === -1) marcasInv.push(m.nombre);
+    });
+    marcasInv.sort().forEach(function(nombre){
+      var btn = document.createElement('button');
+      btn.className = 'login-type-btn';
+      btn.style.cssText = 'padding:14px;font-size:11px;width:100%;text-align:left';
+      btn.textContent = nombre;
+      btn.onclick = function(){ loginSelectMarca(nombre); };
+      list.appendChild(btn);
+    });
+    document.getElementById('login-step-marcas').style.display = 'flex';
+  }
+}
+
+function loginSelectMarca(nombre){
+  _loginMarca = nombre;
   _pinBuffer = '';
   updatePinDots();
   document.getElementById('login-error').textContent = '';
-  document.querySelectorAll('.login-type-btn').forEach(function(b){b.classList.remove('active');});
-  document.getElementById('lt-'+type).classList.add('active');
-  if(type==='marca'){
-    populateLoginMarcas();
-    document.getElementById('login-marca-sel').style.display = 'block';
+  document.getElementById('login-pin-quien').textContent = nombre;
+  document.getElementById('login-step-marcas').style.display = 'none';
+  document.getElementById('login-step-pin').style.display = 'flex';
+}
+
+function loginBack(){
+  _pinBuffer = '';
+  updatePinDots();
+  document.getElementById('login-error').textContent = '';
+  var pinVisible = document.getElementById('login-step-pin').style.display !== 'none';
+  var marcasVisible = document.getElementById('login-step-marcas').style.display !== 'none';
+  document.getElementById('login-step-pin').style.display = 'none';
+  document.getElementById('login-step-marcas').style.display = 'none';
+  document.getElementById('login-step-tipo').style.display = 'none';
+  if(pinVisible && _loginType === 'marca'){
+    document.getElementById('login-step-marcas').style.display = 'flex';
   } else {
-    document.getElementById('login-marca-sel').style.display = 'none';
+    document.getElementById('login-step-tipo').style.display = 'flex';
   }
 }
 
 function populateLoginMarcas(){
-  var sel = document.getElementById('login-marca-sel');
-  sel.innerHTML = '<option value="">Selecciona tu marca...</option>';
-  (CFG.marcas||[]).forEach(function(m){
-    if(m.nombre === 'Tienda' || m.nombre === 'Consignacion') return;
-    var opt = document.createElement('option');
-    opt.value = m.nombre; opt.textContent = m.nombre;
-    sel.appendChild(opt);
-  });
+  // No-op ahora — se hace en loginStep2
 }
 
-function onLoginMarcaChange(){
-  _loginMarca = document.getElementById('login-marca-sel').value;
-  _pinBuffer = '';
-  updatePinDots();
-  document.getElementById('login-error').textContent = '';
-}
+function setLoginType(type){ loginStep2(type); }
 
 function pinPress(n){
   if(_pinBuffer.length >= 4) return;
@@ -1983,11 +2034,17 @@ async function loadMarcaVista(marca){
   var page = document.getElementById('page-marca');
   page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Cargando '+esc(marca)+'...</div>';
 
-  // Fetch todos los meses en paralelo
+  // Fetch todos los meses en paralelo — usar cache del resumen si existe
   var promises = MESES.map(function(mes){
+    // Usar cache si existe
+    if(_resumenCache[mes]){
+      var ventas = (_resumenCache[mes].ventas||[]).filter(function(v){ return v.marca===marca; });
+      return Promise.resolve({mes: mes, ventas: ventas});
+    }
     return fetch(API+'/pos/historial/'+mes)
       .then(function(r){ return r.json(); })
       .then(function(d){
+        _resumenCache[mes] = d; // guardar en cache
         var ventas = (d.ventas||[]).filter(function(v){ return v.marca===marca; });
         return {mes: mes, ventas: ventas};
       })
@@ -2005,13 +2062,23 @@ async function loadMarcaVista(marca){
   });
 
   if(!mesesConVentas.length){
-    page.innerHTML = '<div style="padding:60px;text-align:center;color:var(--gray4);font-size:10px;letter-spacing:.2em">Sin ventas registradas para '+esc(marca)+'</div>';
+    document.querySelector('nav').style.display = '';
+    document.getElementById('page-marca').classList.remove('active');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-step-pin').style.display = 'none';
+    document.getElementById('login-step-marcas').style.display = 'none';
+    document.getElementById('login-step-tipo').style.display = 'flex';
+    localStorage.removeItem(SESSION_KEY);
+    setTimeout(function(){
+      var errEl = document.getElementById('login-error');
+      if(errEl) errEl.textContent = 'Sin ventas registradas para '+marca;
+    }, 100);
     return;
   }
 
   _marcaVistaMes = mesesConVentas[mesesConVentas.length-1];
 
-  // Usar cache de stock si existe, sino cargar
+  // Usar cache de stock si existe
   var stockMarca = [];
   if(_stockCache){
     stockMarca = _stockCache.filter(function(i){ return i.marca===marca; });
