@@ -2035,10 +2035,31 @@ function enterPOS(){
 
 function enterMarcaVista(marca){
   document.getElementById('login-screen').classList.add('hidden');
-  // Ocultar nav del POS
   document.querySelector('nav').style.display = 'none';
   document.getElementById('page-marca').classList.add('active');
-  loadMarcaVista(marca);
+  loadMarcaVista(marca).catch(function(e){
+    console.error('[MarcaVista] Error:', e);
+    volverAlLogin('Error cargando datos de '+marca);
+  });
+}
+
+function volverAlLogin(mensaje){
+  localStorage.removeItem(SESSION_KEY);
+  document.querySelector('nav').style.display = '';
+  document.getElementById('page-marca').classList.remove('active');
+  document.getElementById('page-marca').innerHTML = '';
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-step-pin').style.display = 'none';
+  document.getElementById('login-step-marcas').style.display = 'none';
+  document.getElementById('login-step-tipo').style.display = 'flex';
+  _pinBuffer = '';
+  updatePinDots();
+  if(mensaje){
+    setTimeout(function(){
+      var errEl = document.getElementById('login-error');
+      if(errEl) errEl.textContent = mensaje;
+    }, 100);
+  }
 }
 
 // ── VISTA MARCA ───────────────────────────────────────────────────────────────
@@ -2078,17 +2099,7 @@ async function loadMarcaVista(marca){
   });
 
   if(!mesesConVentas.length){
-    document.querySelector('nav').style.display = '';
-    document.getElementById('page-marca').classList.remove('active');
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('login-step-pin').style.display = 'none';
-    document.getElementById('login-step-marcas').style.display = 'none';
-    document.getElementById('login-step-tipo').style.display = 'flex';
-    localStorage.removeItem(SESSION_KEY);
-    setTimeout(function(){
-      var errEl = document.getElementById('login-error');
-      if(errEl) errEl.textContent = 'Sin ventas registradas para '+marca;
-    }, 100);
+    volverAlLogin('Sin ventas registradas para '+marca);
     return;
   }
 
