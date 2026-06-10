@@ -1287,7 +1287,7 @@ nav{
       <button class="pin-btn" onclick="pinPress(8)">8</button>
       <button class="pin-btn" onclick="pinPress(9)">9</button>
       <button class="pin-btn" onclick="pinPress(0)" style="grid-column:2">0</button>
-      <button class="pin-btn" onclick="pinBackspace()">⌫</button>
+      <button class="pin-btn" onclick="pinBackspace()" style="font-size:22px">⌫</button>
     </div>
     <div class="login-error" id="login-error"></div>
     <button onclick="loginBack()" style="margin-top:8px;background:none;border:none;color:#555;font-family:var(--font);font-size:9px;letter-spacing:.15em;text-transform:uppercase;cursor:pointer">← Volver</button>
@@ -1898,30 +1898,46 @@ function loginStep2(tipo){
     document.getElementById('login-pin-quien').textContent = 'PIN Trabajador';
     document.getElementById('login-step-pin').style.display = 'flex';
   } else {
-    // Poblar lista de marcas desde inventario + CFG
-    var list = document.getElementById('login-marcas-list');
-    list.innerHTML = '';
-    // Obtener marcas únicas del inventario
-    var marcasInv = [];
-    (stockData||[]).forEach(function(item){
-      if(item.marca && item.marca !== 'Tienda' && item.marca !== 'Consignacion' && marcasInv.indexOf(item.marca) === -1){
-        marcasInv.push(item.marca);
-      }
-    });
-    // También agregar las del CFG que no están en inventario
-    (CFG.marcas||[]).forEach(function(m){
-      if(m.nombre === 'Tienda' || m.nombre === 'Consignacion') return;
-      if(marcasInv.indexOf(m.nombre) === -1) marcasInv.push(m.nombre);
-    });
-    marcasInv.sort().forEach(function(nombre){
-      var btn = document.createElement('button');
-      btn.className = 'login-type-btn';
-      btn.style.cssText = 'padding:14px;font-size:11px;width:100%;text-align:left';
-      btn.textContent = nombre;
-      btn.onclick = function(){ loginSelectMarca(nombre); };
-      list.appendChild(btn);
-    });
     document.getElementById('login-step-marcas').style.display = 'flex';
+    // Mostrar loading mientras carga
+    var list = document.getElementById('login-marcas-list');
+    list.innerHTML = '<div style="color:#555;font-size:9px;letter-spacing:.1em;padding:10px 0">Cargando marcas...</div>';
+    // Cargar stock si no está disponible aún
+    var poblarMarcas = function(){
+      list.innerHTML = '';
+      var marcasInv = [];
+      (stockData||[]).forEach(function(item){
+        if(item.marca && item.marca !== 'Tienda' && item.marca !== 'Consignacion' && marcasInv.indexOf(item.marca) === -1){
+          marcasInv.push(item.marca);
+        }
+      });
+      (CFG.marcas||[]).forEach(function(m){
+        if(m.nombre === 'Tienda' || m.nombre === 'Consignacion') return;
+        if(marcasInv.indexOf(m.nombre) === -1) marcasInv.push(m.nombre);
+      });
+      marcasInv.sort().forEach(function(nombre){
+        var btn = document.createElement('button');
+        btn.className = 'login-type-btn';
+        btn.style.cssText = 'padding:14px;font-size:11px;width:100%;text-align:left';
+        btn.textContent = nombre;
+        btn.onclick = function(){ loginSelectMarca(nombre); };
+        list.appendChild(btn);
+      });
+    };
+    if(stockData && stockData.length > 0){
+      poblarMarcas();
+    } else {
+      // Cargar stock primero
+      fetch(API+'/pos/stock-marcas')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          stockData = d.items||[];
+          _stockCache = stockData;
+          _stockCacheTime = Date.now();
+          poblarMarcas();
+        })
+        .catch(function(){ poblarMarcas(); });
+    }
   }
 }
 
