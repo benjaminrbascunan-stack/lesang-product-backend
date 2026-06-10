@@ -2148,7 +2148,7 @@ function renderMarcaVista(marca, meses, ventasPorMes, stockMarca){
       +'<div class="marca-prod-name">'+esc(item.nombre_prenda)+'</div>'
       +'<div class="marca-prod-price">$'+fmt(item.precio_venta)+'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">'+tallas+'</div>'
-      +(totalVend>0?'<div class="marca-prod-stock">Ingresado '+totalOrig+' · Vendido <span style="color:var(--orange)">'+totalVend+'</span> · Disponible <span style="color:#2d6a4f">'+item.total+'</span></div>':'')
+      +(totalVend>0?'<div class="marca-prod-stock">Ingresado '+totalOrig+' · <span style="color:var(--orange);font-weight:600">Vendido '+totalVend+'</span> · <span style="color:#2d6a4f;font-weight:600">Disponible '+item.total+'</span></div>':'')
       +'</div></div>';
   }).join('') : '<div style="color:var(--gray4);font-size:10px;padding:20px 0">Sin stock activo</div>';
 
@@ -3781,10 +3781,10 @@ function renderInventario(){
         var totalVend = item.total_vendido||0;
         var totalOrig = item.total_orig||(item.total+totalVend);
         var stockBar = totalVend>0
-          ? '<div style="display:flex;gap:6px;font-size:9px;margin-top:6px">'
-            +'<span style="color:var(--gray4)">Ingresado <strong style="color:var(--text)">'+totalOrig+'</strong></span>'
-            +'<span style="background:var(--orange);color:#fff;padding:1px 6px;font-weight:600">Vendido '+totalVend+'</span>'
-            +'<span style="background:#2d6a4f;color:#fff;padding:1px 6px;font-weight:600">Disponible '+item.total+'</span>'
+          ? '<div style="display:flex;gap:8px;font-size:9px;margin-top:6px;color:var(--gray4)">'
+            +'<span>Ingresado '+totalOrig+'</span>'
+            +'<span style="color:var(--orange);font-weight:600">· Vendido '+totalVend+'</span>'
+            +'<span style="color:#2d6a4f;font-weight:600">· Disponible '+item.total+'</span>'
             +'</div>'
           : '';
         html += '<div class="stock-card">'
