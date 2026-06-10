@@ -1227,6 +1227,17 @@ nav{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
   gap:12px;padding:0 16px 16px;
 }
+@media(max-width:768px){
+  .marca-productos-grid{grid-template-columns:repeat(3,1fr);gap:6px;padding:0 8px 12px}
+  .marca-prod-body{padding:6px 8px}
+  .marca-prod-name{font-size:9px;margin-bottom:2px;line-height:1.2}
+  .marca-prod-price{font-size:10px;margin-bottom:4px}
+  .marca-prod-stock{font-size:7px;margin-top:2px;line-height:1.4}
+  .marca-resumen-grid{margin:8px;gap:1px}
+  .marca-stat-card{padding:10px}
+  .marca-stat-val{font-size:16px}
+  .marca-prod-card .talla-badge{font-size:7px!important;padding:1px 3px}
+}
 .marca-prod-card{
   background:var(--white);border:1px solid var(--gray2);overflow:hidden;
 }
