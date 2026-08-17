@@ -4,3 +4,5 @@ __pycache__/
 .env
 credentials.json
 token.json
+archive/
+token_local.json

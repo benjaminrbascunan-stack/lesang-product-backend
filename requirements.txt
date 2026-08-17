@@ -77,3 +77,4 @@ fastapi
 uvicorn
 pillow-heif
 python-multipart
+Pillow
