@@ -166,7 +166,7 @@ DEFAULT_CONFIG = {
         {"nombre": "Consignacion",   "comision": 0.25, "paga_iva": False},
     ],
     "vendedores_externos": ["Marenna", "Michelle"],
-    "com_externo_pct": 0.05,
+    "com_externo_pct": 0.07,
     "com_bancaria": {
         "Débito": 0.0125, "Crédito": 0.0295,
         "Transferencia": 0, "Efectivo": 0, "Internet(Shopify)": 0.02,
